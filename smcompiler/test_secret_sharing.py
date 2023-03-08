@@ -1,10 +1,11 @@
-"""
-Unit tests for the secret sharing scheme.
-Testing secret sharing is not obligatory.
+from secret_sharing import (
+    reconstruct_secret,
+    share_secret,
+)
 
-MODIFY THIS FILE.
-"""
+num_shares = 31
+# ==================== TEST ADDITION ====================
 
 
-def test():
-    raise NotImplementedError("You can create some tests.")
+def test_add():
+    assert reconstruct_secret(share_secret(15, num_shares)) == 15

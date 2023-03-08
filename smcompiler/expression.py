@@ -30,65 +30,55 @@ class Expression:
     """
 
     def __init__(
-            self,
-            id: Optional[bytes] = None
-        ):
+        self,
+        id: Optional[bytes] = None
+    ):
         # If ID is not given, then generate one.
         if id is None:
             id = gen_id()
         self.id = id
 
     def __add__(self, other):
-        raise NotImplementedError("You need to implement this method.")
-
+        return Add(self, other)
 
     def __sub__(self, other):
-        raise NotImplementedError("You need to implement this method.")
-
+        return Add(self, Mul(other, Scalar(-1)))
 
     def __mul__(self, other):
-        raise NotImplementedError("You need to implement this method.")
-
+        return Mul(self, other)
 
     def __hash__(self):
         return hash(self.id)
-
-
-    # Feel free to add as many methods as you like.
 
 
 class Scalar(Expression):
     """Term representing a scalar finite field value."""
 
     def __init__(
-            self,
-            value: int,
-            id: Optional[bytes] = None
-        ):
+        self,
+        value: int,
+        id: Optional[bytes] = None
+    ):
         self.value = value
         super().__init__(id)
-
 
     def __repr__(self):
         return f"{self.__class__.__name__}({repr(self.value)})"
 
-
     def __hash__(self):
-        return
-
-
-    # Feel free to add as many methods as you like.
+        return hash(self.value)
 
 
 class Secret(Expression):
     """Term representing a secret finite field value (variable)."""
 
     def __init__(
-            self,
-            id: Optional[bytes] = None
-        ):
+        self,
+        value: Optional[int] = None,
+        id: Optional[bytes] = None
+    ):
+        self.value = value
         super().__init__(id)
-
 
     def __repr__(self):
         return (
@@ -96,7 +86,35 @@ class Secret(Expression):
         )
 
 
-    # Feel free to add as many methods as you like.
+class Add(Expression):
+    """Term representing the addition of two terms."""
+
+    def __init__(
+        self,
+        left: Expression,
+        right: Expression,
+        id: Optional[bytes] = None
+    ):
+        self.left = left
+        self.right = right
+        super().__init__(id)
+
+    def __repr__(self):
+        return f"({repr(self.left)} + {repr(self.right)})"
 
 
-# Feel free to add as many classes as you like.
+class Mul(Expression):
+    """Term representing the multiplication of two terms."""
+
+    def __init__(
+        self,
+        left: Expression,
+        right: Expression,
+        id: Optional[bytes] = None
+    ):
+        self.left = left
+        self.right = right
+        super().__init__(id)
+
+    def __repr__(self):
+        return f"{repr(self.left)} * {repr(self.right)}"

@@ -8,14 +8,27 @@ MODIFY THIS FILE.
 from expression import Secret, Scalar
 
 
-# Example test, you can adapt it to your needs.
-def test_expr_construction():
-    a = Secret(1)
-    b = Secret(2)
-    c = Secret(3)
+def test_expr_construction_1():
+    [a, b, c] = get_secrets(1, 2, 3)
     expr = (a + b) * c * Scalar(4) + Scalar(3)
-    # assert repr(expr) == "((Secret(1) + Secret(2)) * Secret(3) * Scalar(4) + Scalar(3))"
+    assert repr(
+        expr) == "((Secret(1) + Secret(2)) * Secret(3) * Scalar(4) + Scalar(3))"
 
 
-def test():
-    raise NotImplementedError("You can create some tests.")
+def test_expr_construction_2():
+    [a, b, c] = get_secrets(1, 2, 3)
+    expr = (a + b + c) * Scalar(5) + Scalar(3) - Secret(2)
+    assert repr(
+        expr) == "((((Secret(1) + Secret(2)) + Secret(3)) * Scalar(5) + Scalar(3)) + Secret(2) * Scalar(-1))"
+
+
+def test_expr_construction_3():
+    expr = Scalar(3) - Scalar(3)
+    assert repr(expr) == "(Scalar(3) + Scalar(3) * Scalar(-1))"
+
+
+# ==================== HELPER FUNCTIONS ====================
+
+
+def get_secrets(*numbers):
+    return list(Secret(number) for number in numbers)
