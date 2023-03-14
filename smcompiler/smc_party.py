@@ -64,112 +64,85 @@ class SMCParty:
         The method the client use to do the SMC.
         """
 
-        # Get the expression to evaluate
-        expr = self.protocol_spec.expr
+        # Get the share
+        share = self.process_expression(self.protocol_spec.expr)
 
-        clients = self.protocol_spec.participant_ids
+        # Send the share to the server
+        self.comm.publish_message(
+            "final share: " + str(self.client_id), share.serialize())
 
-        # Process the expression
-        for secret, value in self.value_dict.items():
-
-            # Partition the secret into shares
-            shares = share_secret(value, len(clients))
-
-            # For each client
-            for i, client in enumerate(clients):
-
-                # Check if the client is not the current client
-                if client != self.client_id:
-
-                    # Send the share to the server
-                    self.comm.send_private_message(
-                        client,
-                        "from " + self.client_id + " to " + client,
-                        shares[i].serialize()
-                    )
-        shares = []
-
-        # Receive the shares from the server
-        for i, client in enumerate(clients):
-
-            # Check if the client is not the current client
-            if client != self.client_id:
-
-                # Receive the share from the server
-                share = self.comm.retrieve_private_message(
-                    "from " + client + " to " + self.client_id
-                )
-
-                # Deserialize the share
-                shares.append(Share.deserialize(share))
-
-        # Reconstruct the secret
-        result = reconstruct_secret(shares)
-
-        print("Result: " + str(result))
-
-        # Send the result to the server
-        return result
+        # Get the result from the server
+        return reconstruct_secret([Share.deserialize(self.comm.retrieve_public_message(other_client_id, "final share: " + str(other_client_id))) for other_client_id in self.protocol_spec.participant_ids])
 
     def process_expression(
         self,
         expr: Expression
-    ):
+    ) -> Share:
         """
         Process an expression using the visitor pattern.
         """
+        print("Processing expression: " + str(expr))
 
-        if isinstance(expr, Add):
-            return self.process_add(expr)
-
-        elif isinstance(expr, Mul):
-            return self.process_mul(expr)
-
-        elif isinstance(expr, Secret):
+        # Process the expression
+        if isinstance(expr, Secret):
             return self.process_secret(expr)
 
         elif isinstance(expr, Scalar):
-            return self.process_scalar(expr)
+            return expr.value
 
-        else:
-            raise ValueError("Unknown expression type.")
+        elif isinstance(expr, Add):
+            return self.process_add(self.process_expression(expr.left), self.process_expression(expr.right))
 
-    def process_add(self, expr: Add) -> int:
-        """
-        Process an Add expression.
-        """
+        elif isinstance(expr, Mul):
+            return self.process_mul(self.process_expression(expr.left), self.process_expression(expr.right))
 
-        # Process the left and right subexpressions
-        left = self.process_expression(expr.left)
-        right = self.process_expression(expr.right)
-
-        # Add the results
-        return left + right
-
-    def process_mul(self, expr: Mul) -> int:
+    def process_mul(self, left: Union[Expression, int], right: Union[Expression, int]) -> Share:
         """
         Process a Mul expression.
         """
 
-        # Process the left and right subexpressions
-        left = self.process_expression(expr.left)
-        right = self.process_expression(expr.right)
+        # Scalar multiplication
+        if isinstance(left, Share) and isinstance(right, Share):
+            return NotImplementedError
 
-        # Multiply the results
         return left * right
 
-    def process_secret(self, expr: Secret) -> int:
+    def process_add(self, left: Union[Expression, int], right: Union[Expression, int]) -> Share:
+        """
+        Process an Add expression.
+        """
+
+        # Scalar addition
+        is_first_party = (self.client_id == min(
+            self.protocol_spec.participant_ids))
+
+        if isinstance(left, int) and not is_first_party:
+            return right
+
+        elif isinstance(right, int) and not is_first_party:
+            return left
+
+        return left + right
+
+    def process_secret(self, expr: Secret) -> Share:
         """
         Process a Secret expression.
         """
+        # Send shares
+        if expr in self.value_dict:
+            shares = share_secret(self.value_dict[expr], len(
+                self.protocol_spec.participant_ids))
+            for client_id, share in zip(self.protocol_spec.participant_ids, shares):
+                if client_id == self.client_id:
+                    result = share
+                    continue
+                self.comm.send_private_message(
+                    client_id, "share " + str(expr.id), share.serialize())
+        else:
 
-        # Get the value of the secret
-        return self.value_dict[expr]
+            # Receive share
+            result = Share.deserialize(
+                self.comm.retrieve_private_message("share " + str(expr.id)))
 
-    def process_scalar(self, expr: Scalar) -> int:
-        """
-        Process a Scalar expression.
-        """
-
-        # Get the value of the scalar
-        return expr.value
+        # Return the result
+        return result
