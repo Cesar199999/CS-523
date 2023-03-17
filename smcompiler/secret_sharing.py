@@ -15,7 +15,7 @@ class Share:
     A secret share in a finite field.
     """
 
-    def __init__(self, q: int, N: int, value: int = None):
+    def __init__(self, N: int, q: int = 101, value: int = None):
         self.q = q
         self.N = N
         self.value = value if value is not None else random.randint(0, q)

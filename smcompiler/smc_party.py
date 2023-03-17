@@ -94,18 +94,23 @@ class SMCParty:
             return self.process_add(self.process_expression(expr.left), self.process_expression(expr.right))
 
         elif isinstance(expr, Mul):
-            return self.process_mul(self.process_expression(expr.left), self.process_expression(expr.right))
+            return self.process_mul(expr)
 
-    def process_mul(self, left: Union[Expression, int], right: Union[Expression, int]) -> Share:
+    def process_mul(self, expr: Expression) -> Share:
         """
         Process a Mul expression.
         """
+        # share multiplication
+        if isinstance(expr.left, Share) and isinstance(expr.right, Share):
+            beaver = self.comm.retrieve_beaver_triplet_shares(expr.id)
+            d = Share(101, value=expr.left-beaver[0])
+            self.comm.publish_message(d)
+            e = Share(101, value=expr.left-beaver[1])
+            self.comm.publish_message(e)
+            sv = d*e + d*beaver[1] + e*beaver[0] + beaver[2]
+            return sv
 
-        # Scalar multiplication
-        if isinstance(left, Share) and isinstance(right, Share):
-            return NotImplementedError
-
-        return left * right
+        return expr.left * expr.right
 
     def process_add(self, left: Union[Expression, int], right: Union[Expression, int]) -> Share:
         """

@@ -5,6 +5,7 @@ MODIFY THIS FILE.
 """
 
 import collections
+from random import randint
 from typing import (
     Dict,
     Set,
@@ -39,6 +40,10 @@ class TrustedParamGenerator:
         """
         Retrieve a triplet of shares for a given client_id.
         """
-        raise NotImplementedError("You need to implement this method.")
+
+        a = Share(101, 3)
+        b = Share(101, 3)
+        c = a*b
+        return (a,b,c)
 
     # Feel free to add as many methods as you want.
