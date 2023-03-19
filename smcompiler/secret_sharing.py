@@ -15,9 +15,9 @@ class Share:
     A secret share in a finite field.
     """
 
-    def __init__(self, N: int, q: int = 101, value: int = None):
+    # TODO: Fix the random prime.
+    def __init__(self, q: int = 101, value: int = None):
         self.q = q
-        self.N = N
         self.value = value if value is not None else random.randint(0, q)
 
     def __repr__(self):
@@ -30,33 +30,33 @@ class Share:
         if isinstance(other, int):
 
             # Scalar addition
-            return Share(self.q, self.N, (self.value + other) % self.q)
+            return Share(self.q, (self.value + other) % self.q)
 
         # Typecheck
         self.typecheck_share(other)
 
         # Add the shares
-        return Share(self.q, self.N, (self.value + other.value) % self.q)
+        return Share(self.q, (self.value + other.value) % self.q)
 
     def __sub__(self, other):
 
         if isinstance(other, int):
 
             # Scalar subtraction
-            return Share(self.q, self.N, (self.value - other) % self.q)
+            return Share(self.q, (self.value - other) % self.q)
 
         # Typecheck
         self.typecheck_share(other)
 
         # Subtract the shares
-        return Share(self.q, self.N, (self.value - other.value) % self.q)
+        return Share(self.q, (self.value - other.value) % self.q)
 
     def __mul__(self, other):
 
         if isinstance(other, int):
 
             # Scalar multiplication
-            return Share(self.q, self.N, (self.value * other) % self.q)
+            return Share(self.q, (self.value * other) % self.q)
         raise NotImplementedError
 
     def serialize(self):
@@ -74,7 +74,7 @@ class Share:
         """Check if the share is from the same field."""
 
         # Check if the shares are from the same field
-        if self.q != other.q or self.N != other.N:
+        if self.q != other.q:
             raise ValueError(
                 "Shares do not belong to the same field or are not of the same length.")
 
@@ -82,15 +82,11 @@ class Share:
 def share_secret(secret: int, num_shares: int) -> List[Share]:
     """Generate shares for a secret."""
 
-    # TODO: Fix the random prime.
-    cardinality = 101
-
     # Generate num_shares - 1 random shares
-    random_shares = [Share(cardinality, num_shares)
-                     for _ in range(num_shares - 1)]
+    random_shares = [Share(value=random()%101) for _ in range(num_shares - 1)]
 
     # Generate the last share such that the sum of all shares is equal to the secret
-    return random_shares + [Share(cardinality, num_shares, (secret - sum(share.value for share in random_shares)) % cardinality)]
+    return random_shares + [Share(value=secret - sum(share.value for share in random_shares) % 101)]
 
 
 def reconstruct_secret(shares: List[Share]) -> int:
