@@ -18,7 +18,7 @@ class Share:
     # TODO: Fix the random prime.
     def __init__(self, q: int = 101, value: int = None):
         self.q = q
-        self.value = value if value is not None else random.randint(0, q)
+        self.value = value if value is not None else randint(0, q)
 
     def __repr__(self):
 
@@ -33,7 +33,7 @@ class Share:
             return Share(self.q, (self.value + other) % self.q)
 
         # Typecheck
-        self.typecheck_share(other)
+        #self.typecheck_share(other)
 
         # Add the shares
         return Share(self.q, (self.value + other.value) % self.q)
