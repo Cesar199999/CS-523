@@ -8,4 +8,6 @@ num_shares = 31
 
 
 def test_add():
-    assert reconstruct_secret(share_secret(15, num_shares)) == 15
+    shares = share_secret(15, num_shares=31)
+    reconstruct = reconstruct_secret(shares)
+    assert reconstruct == 15
