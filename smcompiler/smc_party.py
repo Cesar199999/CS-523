@@ -91,10 +91,13 @@ class SMCParty:
             return expr.value
 
         elif isinstance(expr, Add):
-            return self.process_add(self.process_expression(expr.left), self.process_expression(expr.right))
+            return self.process_add(expr)
 
         elif isinstance(expr, Mul):
             return self.process_mul(expr)
+        
+        elif isinstance(expr, Share):
+            return expr
 
     def process_mul(self, expr: Expression) -> Share:
         """
@@ -103,16 +106,16 @@ class SMCParty:
         # share multiplication
         if isinstance(expr.left, Share) and isinstance(expr.right, Share):
             beaver = self.comm.retrieve_beaver_triplet_shares(expr.id)
-            d = Share(101, value=expr.left-beaver[0])
+            d = Share(101, value=self.process_expression(expr.left)-beaver[0])
             self.comm.publish_message(d)
-            e = Share(101, value=expr.left-beaver[1])
+            e = Share(101, value=self.process_expression(expr.right)-beaver[1])
             self.comm.publish_message(e)
             sv = d*e + d*beaver[1] + e*beaver[0] + beaver[2]
             return sv
 
-        return expr.left * expr.right
+        return self.process_expression(expr.left) * self.process_expression(expr.right)
 
-    def process_add(self, left: Union[Expression, int], right: Union[Expression, int]) -> Share:
+    def process_add(self, expr) -> Share:
         """
         Process an Add expression.
         """
@@ -121,13 +124,13 @@ class SMCParty:
         is_first_party = (self.client_id == min(
             self.protocol_spec.participant_ids))
 
-        if isinstance(left, int) and not is_first_party:
-            return right
+        if isinstance(expr.left, int) and not is_first_party:
+            return self.process_expression(expr.right)
 
-        elif isinstance(right, int) and not is_first_party:
-            return left
+        elif isinstance(expr.right, int) and not is_first_party:
+            return self.process_expression(expr.left)
 
-        return left + right
+        return self.process_expression(expr.left) + self.process_expression(expr.right)
 
     def process_secret(self, expr: Secret) -> Share:
         """
@@ -144,7 +147,6 @@ class SMCParty:
                 self.comm.send_private_message(
                     client_id, "share " + str(expr.id), share.serialize())
         else:
-
             # Receive share
             result = Share.deserialize(
                 self.comm.retrieve_private_message("share " + str(expr.id)))
