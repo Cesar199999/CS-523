@@ -7,6 +7,7 @@ MODIFY THIS FILE.
 
 import collections
 import json
+import pickle
 from typing import (
     Dict,
     Set,
@@ -105,12 +106,18 @@ class SMCParty:
         """
         # share multiplication
         if isinstance(expr.left, Share) and isinstance(expr.right, Share):
-            beaver = self.comm.retrieve_beaver_triplet_shares(expr.id)
-            d = Share(101, value=self.process_expression(expr.left)-beaver[0])
-            self.comm.publish_message(d)
-            e = Share(101, value=self.process_expression(expr.right)-beaver[1])
-            self.comm.publish_message(e)
-            sv = d*e + d*beaver[1] + e*beaver[0] + beaver[2]
+            a,b,c = self.comm.retrieve_beaver_triplet_shares(expr.id)
+            d = Share(101, value=self.process_expression(expr.left)-a)
+            self.comm.publish_message("beaver: d"+str(expr.id.__hash__(), pickle.dumps(d)))
+            e = Share(101, value=self.process_expression(expr.right)-b)
+            self.comm.publish_message("beaver: e"+str(expr.id.__hash__(), pickle.dumps(e)))
+
+            for client in self.protocol_spec.participant_ids:
+                if client != self.client_id:
+                    d = d + pickle.load(self.comm.retrieve_public_message(client, "beaver: d"+str(expr.id.__hash__())))
+                    e = e + pickle.load(self.comm.retrieve_public_message(client, "beaver: e"+str(expr.id.__hash__())))
+            
+            sv = d*e + d*b + e*a + c
             return sv
 
         return self.process_expression(expr.left) * self.process_expression(expr.right)
@@ -123,11 +130,11 @@ class SMCParty:
         # Scalar addition
         is_first_party = (self.client_id == min(
             self.protocol_spec.participant_ids))
-
-        if isinstance(expr.left, int) and not is_first_party:
+        
+        if isinstance(expr.left, Scalar) and not is_first_party:
             return self.process_expression(expr.right)
 
-        elif isinstance(expr.right, int) and not is_first_party:
+        elif isinstance(expr.right, Scalar) and not is_first_party:
             return self.process_expression(expr.left)
 
         return self.process_expression(expr.left) + self.process_expression(expr.right)

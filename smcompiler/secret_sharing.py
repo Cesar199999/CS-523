@@ -33,7 +33,7 @@ class Share:
             return Share(self.q, (self.value + other) % self.q)
 
         # Typecheck
-        #self.typecheck_share(other)
+        self.typecheck_share(other)
 
         # Add the shares
         return Share(self.q, (self.value + other.value) % self.q)
@@ -57,7 +57,8 @@ class Share:
 
             # Scalar multiplication
             return Share(self.q, (self.value * other) % self.q)
-        raise NotImplementedError
+        else:
+            return Share(self.q, (self.value * other.value)%self.q)
 
     def serialize(self):
         """Generate a representation suitable for passing in a message."""
