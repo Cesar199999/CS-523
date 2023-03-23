@@ -28,11 +28,11 @@ class BeaverTriplet:
         self.b = Share(101)
         self.c = self.a*self.b
 
-        self.a_shares = share_secret(self.a, num_participant)
-        self.b_shares = share_secret(self.b, num_participant)
-        self.c_shares = share_secret(self.c, num_participant)
+        self.a_shares = share_secret(self.a.value, num_participant)
+        self.b_shares = share_secret(self.b.value, num_participant)
+        self.c_shares = share_secret(self.c.value, num_participant)
     
-    def get_share_triplet(self, client_nb: int) -> Tuple[Share, Share, Share]:
+    def get_share_triplets(self, client_nb: int) -> Tuple[Share, Share, Share]:
         return (self.a_shares[client_nb], self.b_shares[client_nb], self.c_shares[client_nb])
 
 class TrustedParamGenerator:
@@ -64,7 +64,6 @@ class TrustedParamGenerator:
 
         triplet =  self.operation_triplets[op_id]
         (a,b,c) = triplet.get_share_triplets(self.client_number[client_id])
-
         return (a,b,c)
 
     # Feel free to add as many methods as you want.

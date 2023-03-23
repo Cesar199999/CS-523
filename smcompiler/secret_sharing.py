@@ -87,8 +87,10 @@ def share_secret(secret: int, num_shares: int) -> List[Share]:
     random_shares = [Share(value=randint(0,100)) for _ in range(num_shares - 1)]
 
     # Generate the last share such that the sum of all shares is equal to the secret
-    random_shares.append(Share(value=secret - sum(share.value for share in random_shares) % 101))
-    random_shares.reverse()
+
+    first_share = Share(value=secret-sum([share.value for share in random_shares]))
+    random_shares.append(first_share)
+
     return random_shares
 
 
