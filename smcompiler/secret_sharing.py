@@ -16,7 +16,7 @@ class Share:
     """
 
     # TODO: Fix the random prime.
-    def __init__(self, q: int = 101, value: int = None):
+    def __init__(self, value: int = None, q: int = 101):
         self.q = q
         self.value = value if value is not None else randint(0, q)
 
@@ -30,35 +30,35 @@ class Share:
         if isinstance(other, int):
 
             # Scalar addition
-            return Share(self.q, (self.value + other) % self.q)
+            return Share((self.value + other) % self.q, self.q)
 
         # Typecheck
         self.typecheck_share(other)
 
         # Add the shares
-        return Share(self.q, (self.value + other.value) % self.q)
+        return Share((self.value + other.value) % self.q, self.q)
 
     def __sub__(self, other):
 
         if isinstance(other, int):
 
             # Scalar subtraction
-            return Share(self.q, (self.value - other) % self.q)
+            return Share((self.value - other) % self.q, self.q)
 
         # Typecheck
         self.typecheck_share(other)
 
         # Subtract the shares
-        return Share(self.q, (self.value - other.value) % self.q)
+        return Share((self.value - other.value) % self.q, self.q)
 
     def __mul__(self, other):
 
         if isinstance(other, int):
 
             # Scalar multiplication
-            return Share(self.q, (self.value * other) % self.q)
+            return Share( (self.value * other) % self.q, self.q)
         else:
-            return Share(self.q, (self.value * other.value)%self.q)
+            return Share((self.value * other.value)%self.q, self.q)
 
     def serialize(self):
         """Generate a representation suitable for passing in a message."""

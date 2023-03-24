@@ -5,7 +5,7 @@ MODIFY THIS FILE.
 """
 
 import collections
-from random import randint
+from random import randint, sample
 from typing import (
     Dict,
     Set,
@@ -24,13 +24,12 @@ class BeaverTriplet:
     """class holding beaver triplet with their shares"""
 
     def __init__(self, num_participant):
-        self.a = Share(101)
-        self.b = Share(101)
-        self.c = self.a*self.b
+        self.a, self.b = sample(range(101), 2)
+        self.c = (self.a * self.b)%101
 
-        self.a_shares = share_secret(self.a.value, num_participant)
-        self.b_shares = share_secret(self.b.value, num_participant)
-        self.c_shares = share_secret(self.c.value, num_participant)
+        self.a_shares = share_secret(self.a, num_participant)
+        self.b_shares = share_secret(self.b, num_participant)
+        self.c_shares = share_secret(self.c, num_participant)
     
     def get_share_triplets(self, client_nb: int) -> Tuple[Share, Share, Share]:
         return (self.a_shares[client_nb], self.b_shares[client_nb], self.c_shares[client_nb])
@@ -58,8 +57,7 @@ class TrustedParamGenerator:
         Retrieve a triplet of shares for a given client_id.
         """
 
-        if op_id not in self.operation_triplets:
-            
+        if op_id not in self.operation_triplets:   
             self.operation_triplets[op_id] = BeaverTriplet(len(self.participant_ids))
 
         triplet =  self.operation_triplets[op_id]

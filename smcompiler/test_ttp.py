@@ -33,16 +33,24 @@ def test_participants():
 def test_beaver():
     triplet = BeaverTriplet(3)
 
-    assert triplet.a * triplet.b == triplet.c 
-    assert Share(triplet.a) * Share(triplet.b) == Share(triplet.c)
+    assert (triplet.a * triplet.b)%101 == triplet.c
+    sharea = Share(value=triplet.a)
+    shareb = Share(value=triplet.b)
+    sharec = Share(value=triplet.c)
+    product = sharea*shareb
+    assert product.value == sharec.value
 
-    a_1, b_1, c_1 = triplet.get_shares(0)
-    a_2, b_2, c_2 = triplet.get_shares(1)
-    a_3, b_3, c_3 = triplet.get_shares(2)
+    a_1, b_1, c_1 = triplet.get_share_triplets(0)
+    a_2, b_2, c_2 = triplet.get_share_triplets(1)
+    a_3, b_3, c_3 = triplet.get_share_triplets(2)
 
-    assert a_1 + a_2 + a_3 == Share(triplet.a)
-    assert b_1 + b_2 + b_3 == Share(triplet.b)
-    assert c_1 + c_2 + c_3 == Share(triplet.c)
+    sum_a = a_1 + a_2 + a_3
+    sum_b = b_1 + b_2 + b_3
+    sum_c = c_1 + c_2 + c_3
+
+    assert sum_a.value == Share(value = triplet.a).value
+    assert sum_b.value == Share(value = triplet.b).value
+    assert sum_c.value == Share(value = triplet.c).value
 
 
 def test_retrieveshare():
