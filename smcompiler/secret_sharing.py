@@ -4,10 +4,23 @@ Secret sharing scheme.
 
 from __future__ import annotations
 
-from typing import List, Union
+from typing import List
+import petrelic.bn as bn
 
 from random import randint
 import pickle
+
+
+class UniquePrime():
+    """ Wrapper class to fix a unique prime number at runtime.
+        This is used to ensure that the same prime number is used for all shares.
+    """
+
+    unique_prime = bn.Bn.get_prime(512).int()
+
+    # Singleton pattern.
+    def __init__(self):
+        pass
 
 
 class Share:
@@ -15,10 +28,16 @@ class Share:
     A secret share in a finite field.
     """
 
-    # TODO: Fix the random prime.
-    def __init__(self, value: int = None, q: int = 101):
-        self.q = q
-        self.value = value if value is not None else randint(0, q)
+    # Initialize a share with a value and a prime number.
+    def __init__(self, value: int = None):
+        """Initialize a share with a value and a prime number.
+
+        Args:
+            value (int): The value of the share. Defaults to a random integer in the finite field.
+            q (int): The prime number. Defaults to a random prime of 256 bits.
+        """
+        self.q = UniquePrime().unique_prime
+        self.value = value if value is not None else randint(0, self.q - 1)
 
     def __repr__(self):
 
@@ -30,35 +49,30 @@ class Share:
         if isinstance(other, int):
 
             # Scalar addition
-            return Share((self.value + other) % self.q, self.q)
+            return Share((self.value + other) % self.q)
 
-        # Typecheck
-        self.typecheck_share(other)
-
-        # Add the shares
-        return Share((self.value + other.value) % self.q, self.q)
+        # Share addition.
+        return Share((self.value + other.value) % self.q)
 
     def __sub__(self, other):
 
         if isinstance(other, int):
 
-            # Scalar subtraction
-            return Share((self.value - other) % self.q, self.q)
+            # Scalar subtraction.
+            return Share((self.value - other) % self.q)
 
-        # Typecheck
-        self.typecheck_share(other)
-
-        # Subtract the shares
-        return Share((self.value - other.value) % self.q, self.q)
+        # Share subtraction.
+        return Share((self.value - other.value) % self.q)
 
     def __mul__(self, other):
 
         if isinstance(other, int):
 
-            # Scalar multiplication
-            return Share( (self.value * other) % self.q, self.q)
-        else:
-            return Share((self.value * other.value)%self.q, self.q)
+            # Scalar multiplication.
+            return Share((self.value * other) % self.q)
+
+        # Share multiplication.
+        return Share((self.value * other.value) % self.q)
 
     def serialize(self):
         """Generate a representation suitable for passing in a message."""
@@ -71,27 +85,17 @@ class Share:
 
         return pickle.loads(serialized)
 
-    def typecheck_share(self, other: Share) -> None:
-        """Check if the share is from the same field."""
-
-        # Check if the shares are from the same field
-        if self.q != other.q:
-            raise ValueError(
-                "Shares do not belong to the same field or are not of the same length.")
-
 
 def share_secret(secret: int, num_shares: int) -> List[Share]:
     """Generate shares for a secret."""
 
-    # Generate num_shares - 1 random shares
-    random_shares = [Share(value=randint(0,100)) for _ in range(num_shares - 1)]
+    # Generate num_shares - 1 random shares.
+    random_shares = [Share() for _ in range(num_shares - 1)]
 
-    # Generate the last share such that the sum of all shares is equal to the secret
+    # Generate the last share such that the sum of all shares is equal to the secret.
+    first_share = Share(secret - sum(share.value for share in random_shares))
 
-    first_share = Share(value=secret-sum([share.value for share in random_shares]))
-    random_shares.append(first_share)
-
-    return random_shares
+    return random_shares + [first_share]
 
 
 def reconstruct_secret(shares: List[Share]) -> int:

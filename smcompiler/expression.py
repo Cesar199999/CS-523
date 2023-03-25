@@ -39,7 +39,7 @@ class Expression:
         self.id = id
 
     def __add__(self, other):
-        return  Add(self, other)
+        return Add(self, other)
 
     def __sub__(self, other):
         return Add(self, Mul(other, Scalar(-1)))

@@ -1,0 +1,2 @@
+/.pytest_cache/*
+/smcompiler/__pycache__/*
