@@ -117,4 +117,4 @@ class Mul(Expression):
         super().__init__(id)
 
     def __repr__(self):
-        return f"{repr(self.left)} * {repr(self.right)}"
+        return f"({repr(self.left)} * {repr(self.right)})"
