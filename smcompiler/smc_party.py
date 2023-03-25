@@ -54,7 +54,7 @@ class SMCParty:
         self.client_id = client_id
         self.protocol_spec = protocol_spec
         self.value_dict = value_dict
-        self.share_dict: dict[Secret, Share] = {}
+        self.share_dict: Dict[Secret, Share] = {}
 
     def run(self) -> int:
         """

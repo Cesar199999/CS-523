@@ -6,6 +6,7 @@ MODIFY THIS FILE.
 
 from random import randint
 from typing import (
+    Dict,
     Set,
     Tuple,
 )
@@ -26,8 +27,8 @@ class TrustedParamGenerator:
 
     def __init__(self):
         self.participant_ids: Set[str] = set()
-        self.__operation_id_to_user_id_to_shares: dict[str,
-                                                       dict[str, Tuple[Share, Share, Share]]] = {}
+        self.__operation_id_to_user_id_to_shares: Dict[str,
+                                                       Dict[str, Tuple[Share, Share, Share]]] = {}
 
     def add_participant(self, participant_id: str) -> None:
         """
@@ -45,7 +46,7 @@ class TrustedParamGenerator:
 
         return self.__operation_id_to_user_id_to_shares[op_id][client_id]
 
-    def generate_triplets(self) -> dict[Tuple[Share, Share, Share]]:
+    def generate_triplets(self) -> Dict[str, Tuple[Share, Share, Share]]:
         """
         Generate a random triplet of shares for each participant.
         """
