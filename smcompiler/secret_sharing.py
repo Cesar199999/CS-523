@@ -1,26 +1,28 @@
 """
 Secret sharing scheme.
 """
-
 from __future__ import annotations
+import random
+from typing import List, Union
 
-from typing import List
+import json
+import operator
 import petrelic.bn as bn
-
-from random import randint
-import pickle
 
 
 class UniquePrime():
     """ Wrapper class to fix a unique prime number at runtime.
         This is used to ensure that the same prime number is used for all shares.
     """
-
-    unique_prime = bn.Bn.get_prime(512).int()
+    __unique_prime = bn.Bn.get_prime(16).int()
 
     # Singleton pattern.
     def __init__(self):
         pass
+
+    def get_unique_prime(self):
+        """ Returns the unique prime number. """
+        return self.__unique_prime
 
 
 class Share:
@@ -34,10 +36,10 @@ class Share:
 
         Args:
             value (int): The value of the share. Defaults to a random integer in the finite field.
-            q (int): The prime number. Defaults to a random prime of 256 bits.
+            order (int): The prime number. Defaults to a random prime of 256 bits.
         """
-        self.q = UniquePrime().unique_prime
-        self.value = value if value is not None else randint(0, self.q - 1)
+        self.value = value % UniquePrime().get_unique_prime() if value else random.randint(
+            0, UniquePrime().get_unique_prime() - 1)
 
     def __repr__(self):
 
@@ -46,44 +48,50 @@ class Share:
 
     def __add__(self, other):
 
-        if isinstance(other, int):
+        # Share and scalar addition.
+        return self.compute_operation(other, operator.add)
 
-            # Scalar addition
-            return Share((self.value + other) % self.q)
+    def __radd__(self, other):
 
-        # Share addition.
-        return Share((self.value + other.value) % self.q)
+        # Scalar and share addition.
+        return self.__add__(other)
 
     def __sub__(self, other):
 
-        if isinstance(other, int):
+        # Share and scalar subtraction.
+        return self.compute_operation(other, operator.sub)
 
-            # Scalar subtraction.
-            return Share((self.value - other) % self.q)
+    def __rsub__(self, other):
 
-        # Share subtraction.
-        return Share((self.value - other.value) % self.q)
+        # Scalar and share subtraction.
+        return self.__sub__(other)
 
     def __mul__(self, other):
 
-        if isinstance(other, int):
+        # Share and scalar multiplication.
+        return self.compute_operation(other, operator.mul)
 
-            # Scalar multiplication.
-            return Share((self.value * other) % self.q)
+    def __rmul__(self, other):
 
-        # Share multiplication.
-        return Share((self.value * other.value) % self.q)
+        # Scalar and share multiplication.
+        return self.__mul__(other)
 
     def serialize(self):
         """Generate a representation suitable for passing in a message."""
 
-        return pickle.dumps(self)
+        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=2)
 
     @staticmethod
     def deserialize(serialized) -> Share:
         """Restore object from its serialized representation."""
 
-        return pickle.loads(serialized)
+        return Share(**json.loads(serialized))
+
+    def compute_operation(self, other: Union[int, Share], operation: operator) -> Share:
+        """Compute the operation between two shares."""
+
+        # Now in one line:
+        return Share(operation(self.value, other.value if isinstance(other, Share) else other))
 
 
 def share_secret(secret: int, num_shares: int) -> List[Share]:
@@ -101,4 +109,4 @@ def share_secret(secret: int, num_shares: int) -> List[Share]:
 def reconstruct_secret(shares: List[Share]) -> int:
     """Reconstruct the secret from shares."""
 
-    return sum(share.value for share in shares) % shares[0].q
+    return sum(share.value for share in shares) % UniquePrime().get_unique_prime()
