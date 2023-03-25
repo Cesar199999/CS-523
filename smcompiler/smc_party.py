@@ -6,7 +6,8 @@ MODIFY THIS FILE.
 # You might want to import more classes if needed.
 
 from typing import (
-    Dict
+    Dict,
+    Union
 )
 
 from communication import Communication
@@ -76,7 +77,7 @@ class SMCParty:
     def process_expression(
         self,
         expr: Expression
-    ) -> Share:
+    ) -> Union[Share, int]:
         """
         Process an expression using the visitor pattern.
         """
@@ -93,64 +94,62 @@ class SMCParty:
         elif isinstance(expr, Secret):
             return self.process_secret(expr)
 
-        elif isinstance(expr, Share):
-            return expr.value
-
         elif isinstance(expr, Scalar):
             return expr.value
 
-    def process_mul(self, expr: Expression) -> Share:
+    def process_mul(self, expr: Mul) -> Union[Share, int]:
         """
         Process a Mul expression.
         """
-        # Secret multiplication
-        if isinstance(expr.left, Secret) and isinstance(expr.right, Secret):
+        [share_x, share_y] = [self.process_expression(arg)
+                              for arg in (expr.left, expr.right)]
 
-            # Get Beaver triplet
-            beaver_a, beaver_b, beaver_c = self.comm.retrieve_beaver_triplet_shares(
+        # Share multiplication
+        if isinstance(share_x, Share) and isinstance(share_y, Share):
+
+            # Get Beaver triplet.
+            share_a, share_b, share_c = self.comm.retrieve_beaver_triplet_shares(
                 expr.id.hex())
-
-            # Compute left and right shares
-            share_d = Share(self.process_expression(
-                expr.left) - beaver_a)
-            share_e = Share(self.process_expression(
-                expr.right) - beaver_b)
 
             # Send shares to other parties
             self.comm.publish_message(
-                "share: d " + expr.id.hex(), share_d.serialize())
+                "share: x - a " + self.client_id, (share_x - share_a).serialize())
             self.comm.publish_message(
-                "beaver: e " + expr.id.hex(), share_e.serialize())
+                "share: y - b " + self.client_id, (share_y - share_b).serialize())
 
-            for client in self.protocol_spec.participant_ids:
-                if client != self.client_id:
-                    share_d += Share.deserialize(self.comm.retrieve_public_message(
-                        client, "share: d " + expr.id.hex()))
-                    share_d += Share.deserialize(self.comm.retrieve_public_message(
-                        client, "share: e " + expr.id.hex()))
+            # get reconstructed shares from other parties.
+            value_x_a = self.retrieve_and_reconstruct("share: x - a ")
+            value_y_b = self.retrieve_and_reconstruct("share: y - b ")
 
-            return share_d * share_e + share_d * beaver_b + share_e * beaver_a + beaver_c
+            # Compute and return the result, add extra term iff this party is the first party.
+            return share_c + value_y_b * share_x + value_x_a * share_y - value_x_a * value_y_b * int(self.client_id == min(self.protocol_spec.participant_ids))
 
-        return self.process_expression(expr.left) * self.process_expression(expr.right)
+        return share_x * share_y
 
-    def process_add(self, expr) -> Share:
+    def process_add(self, expr: Add) -> Union[Share, int]:
         """
         Process an Add expression.
         """
 
-        # Scalar addition: Consistently set the first party to be the one with the minimum id.
-        is_first_party = (self.client_id == min(
-            self.protocol_spec.participant_ids))
+        [share_x, share_y] = [self.process_expression(arg)
+                              for arg in (expr.left, expr.right)]
 
-        # Check if the left or right expression is a scalar.
-        if isinstance(expr.left, Scalar) and not is_first_party:
-            return self.process_expression(expr.right)
+        # Check if the left or right expression are integers and if this party is the first party. Consistently set the
+        # first party to be the one with the minimum id.
 
-        elif isinstance(expr.right, Scalar) and not is_first_party:
-            return self.process_expression(expr.left)
+        if not self.client_id == min(self.protocol_spec.participant_ids):
 
-        # Standard addition otherwise.
-        return self.process_expression(expr.left) + self.process_expression(expr.right)
+            if isinstance(share_x, int) and isinstance(share_y, int):
+                return 0
+
+            if isinstance(share_x, int):
+                return share_y
+
+            if isinstance(share_y, int):
+                return share_x
+
+        # Standard share addition.
+        return share_x + share_y
 
     def process_secret(self, expr: Secret) -> Share:
         """
@@ -179,3 +178,14 @@ class SMCParty:
 
         # Return the resulting share.
         return result
+
+    def retrieve_and_reconstruct(self, message: str) -> int:
+        """
+        Retrieve and reconstruct a share.
+        """
+        # Retrieve the serialized shares from the server.
+        result_shares = list(map(lambda id: self.comm.retrieve_public_message(
+            id, message + id), self.protocol_spec.participant_ids))
+
+        # Deserialize the shares and reconstruct the secret.
+        return reconstruct_secret(list(map(Share.deserialize, result_shares)))
