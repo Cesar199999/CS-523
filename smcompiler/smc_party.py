@@ -54,6 +54,7 @@ class SMCParty:
         self.client_id = client_id
         self.protocol_spec = protocol_spec
         self.value_dict = value_dict
+        self.share_dict: dict[Secret, Share] = {}
 
     def run(self) -> int:
         """
@@ -113,13 +114,15 @@ class SMCParty:
 
             # Send shares to other parties
             self.comm.publish_message(
-                "share: x - a " + self.client_id, (share_x - share_a).serialize())
+                "share: x - a multiplication: " + expr.id.hex() + " " + self.client_id, (share_x - share_a).serialize())
             self.comm.publish_message(
-                "share: y - b " + self.client_id, (share_y - share_b).serialize())
+                "share: y - b multiplication: " + expr.id.hex() + " " + self.client_id, (share_y - share_b).serialize())
 
             # get reconstructed shares from other parties.
-            value_x_a = self.retrieve_and_reconstruct("share: x - a ")
-            value_y_b = self.retrieve_and_reconstruct("share: y - b ")
+            value_x_a = self.retrieve_and_reconstruct(
+                "share: x - a multiplication: " + expr.id.hex())
+            value_y_b = self.retrieve_and_reconstruct(
+                "share: y - b multiplication: " + expr.id.hex())
 
             # Compute and return the result, add extra term iff this party is the first party.
             return share_c + value_y_b * share_x + value_x_a * share_y - value_x_a * value_y_b * int(self.client_id == min(self.protocol_spec.participant_ids))
@@ -155,29 +158,33 @@ class SMCParty:
         """
         Process a Secret expression.
         """
-        # If this party has the secret, share it.
-        if expr in self.value_dict:
 
-            # Compute shares.
-            shares = share_secret(self.value_dict[expr], len(
-                self.protocol_spec.participant_ids))
+        # If the secret has not been shared yet, share it.
+        if expr not in self.share_dict:
 
-            # Send shares to other parties.
-            for client_id, share in zip(self.protocol_spec.participant_ids, shares):
+            # If this party has the secret, share it.
+            if expr in self.value_dict:
 
-                # Skip if the client is this client.
-                if client_id == self.client_id:
-                    result = share
-                else:
-                    self.comm.send_private_message(
-                        client_id, "share " + expr.id.hex(), share.serialize())
-        else:
-            # Otherwise, retrieve the share from another party's secret.
-            result = Share.deserialize(
-                self.comm.retrieve_private_message("share " + expr.id.hex()))
+                # Compute shares.
+                shares = share_secret(self.value_dict[expr], len(
+                    self.protocol_spec.participant_ids))
 
-        # Return the resulting share.
-        return result
+                # Send shares to other parties.
+                for client_id, share in zip(self.protocol_spec.participant_ids, shares):
+
+                    # Skip if the client is this client.
+                    if client_id == self.client_id:
+                        self.share_dict[expr] = share
+                    else:
+                        self.comm.send_private_message(
+                            client_id, "share " + expr.id.hex(), share.serialize())
+            else:
+                # Otherwise, retrieve the share from another party's secret.
+                self.share_dict[expr] = Share.deserialize(
+                    self.comm.retrieve_private_message("share " + expr.id.hex()))
+
+        # Return the share in the share dictionary.
+        return self.share_dict[expr]
 
     def retrieve_and_reconstruct(self, message: str) -> int:
         """
@@ -185,7 +192,7 @@ class SMCParty:
         """
         # Retrieve the serialized shares from the server.
         result_shares = list(map(lambda id: self.comm.retrieve_public_message(
-            id, message + id), self.protocol_spec.participant_ids))
+            id, message + " " + id), self.protocol_spec.participant_ids))
 
         # Deserialize the shares and reconstruct the secret.
         return reconstruct_secret(list(map(Share.deserialize, result_shares)))
