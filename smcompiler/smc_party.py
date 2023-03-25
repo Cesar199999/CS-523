@@ -140,10 +140,7 @@ class SMCParty:
         # Check if the left or right expression are integers and if this party is the first party. Consistently set the
         # first party to be the one with the minimum id.
 
-        if not self.client_id == min(self.protocol_spec.participant_ids):
-
-            if isinstance(share_x, int) and isinstance(share_y, int):
-                return 0
+        if not self.client_id == min(self.protocol_spec.participant_ids) and (isinstance(share_x, Share) or isinstance(share_y, Share)):
 
             if isinstance(share_x, int):
                 return share_y
