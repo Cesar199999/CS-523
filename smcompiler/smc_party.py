@@ -89,14 +89,16 @@ class SMCParty:
         if isinstance(expr, Add):
             return self.process_add(expr)
 
-        elif isinstance(expr, Mul):
+        if isinstance(expr, Mul):
             return self.process_mul(expr)
 
-        elif isinstance(expr, Secret):
+        if isinstance(expr, Secret):
             return self.process_secret(expr)
 
-        elif isinstance(expr, Scalar):
+        if isinstance(expr, Scalar):
             return expr.value
+
+        raise TypeError("Unknown expression type: " + str(type(expr)))
 
     def process_mul(self, expr: Mul) -> Union[Share, int]:
         """
