@@ -187,10 +187,10 @@ def test_secret_addition(nb_secret_addition, nb_parties, bit_length, benchmark):
 
 
 @pytest.mark.parametrize("nb_secret_multiplication, nb_parties, bit_length", [
-    # max nb_secret_multiplication is 50, otherwise the cardinality of the field is too small.
-    (2, 2, 8), (10, 2, 8), (50, 2, 8),
-    (2, 4, 8), (10, 4, 8), (50, 4, 8),
-    (2, 8, 8), (10, 8, 8), (50, 8, 8)
+    # max nb_secret_multiplication is 100, otherwise the cardinality of the field is too small.
+    (2, 2, 8), (10, 2, 8), (100, 2, 8),
+    (2, 4, 8), (10, 4, 8), (100, 4, 8),
+    (2, 8, 8), (10, 8, 8), (100, 8, 8)
 ])
 def test_secret_multiplication(nb_secret_multiplication, nb_parties, bit_length, benchmark):
     parties, expr, expected = experiment_definition(
