@@ -158,12 +158,12 @@ def experiment_definition(nb_parties=2, bit_length=8, nb_scalar_addition=0, nb_s
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_addition' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_scalar_addition, nb_parties", [
-    (2, 2), (10, 2), (100, 2), (500, 2), (1000, 2), (5000, 2),
-    (2, 4), (10, 4), (100, 4), (500, 4), (1000, 4), (5000, 4),
-    (2, 8), (10, 8), (100, 8), (500, 8), (1000, 8), (5000, 8),
-    (2, 16), (10, 16), (100, 16), (500, 16), (1000, 16), (5000, 16),
-    (2, 32), (10, 32), (100, 32), (500, 32), (1000, 32), (5000, 32),
-    (2, 64), (10, 64), (100, 64), (500, 64), (1000, 64), (5000, 64)
+    (2, 2), (50, 2), (100, 2), (500, 2), (1000, 2), (2000, 2),
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4),
+    (2, 8), (50, 8), (100, 8), (500, 8), (1000, 8), (2000, 8),
+    (2, 16), (50, 16), (100, 16), (500, 16), (1000, 16), (2000, 16),
+    (2, 32), (50, 32), (100, 32), (500, 32), (1000, 32), (2000, 32),
+    (2, 64), (50, 64), (100, 64), (500, 64), (1000, 64), (2000, 64)
 ])
 def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -174,12 +174,12 @@ def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_multiplication' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_scalar_multiplication, nb_parties", [
-    (2, 2), (10, 2), (100, 2), (500, 2), (1000, 2), (5000, 2),
-    (2, 4), (10, 4), (100, 4), (500, 4), (1000, 4), (5000, 4),
-    (2, 8), (10, 8), (100, 8), (500, 8), (1000, 8), (5000, 8),
-    (2, 16), (10, 16), (100, 16), (500, 16), (1000, 16), (5000, 16),
-    (2, 32), (10, 32), (100, 32), (500, 32), (1000, 32), (5000, 32),
-    (2, 64), (10, 64), (100, 64), (500, 64), (1000, 64), (5000, 64)
+    (2, 2), (50, 2), (100, 2), (500, 2), (1000, 2), (2000, 2),
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4),
+    (2, 8), (50, 8), (100, 8), (500, 8), (1000, 8), (2000, 8),
+    (2, 16), (50, 16), (100, 16), (500, 16), (1000, 16), (2000, 16),
+    (2, 32), (50, 32), (100, 32), (500, 32), (1000, 32), (2000, 32),
+    (2, 64), (50, 64), (100, 64), (500, 64), (1000, 64), (2000, 64)
 ])
 def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -190,12 +190,12 @@ def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
 ### Run with python3 -m pytest benchmark.py -k 'test_secret_addition' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_secret_addition, nb_parties", [
-    (2, 2), (10, 2), (100, 2), (500, 2), (1000, 2), (5000, 2),
-    (2, 4), (10, 4), (100, 4), (500, 4), (1000, 4), (5000, 4),
-    (2, 8), (10, 8), (100, 8), (500, 8), (1000, 8), (5000, 8),
-    (2, 16), (10, 16), (100, 16), (500, 16), (1000, 16), (5000, 16),
-    (2, 32), (10, 32), (100, 32), (500, 32), (1000, 32), (5000, 32),
-    (2, 64), (10, 64), (100, 64), (500, 64), (1000, 64), (5000, 64)
+    (2, 2), (50, 2), (100, 2), (500, 2), (1000, 2), (2000, 2),
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4),
+    (2, 8), (50, 8), (100, 8), (500, 8), (1000, 8), (2000, 8),
+    (2, 16), (50, 16), (100, 16), (500, 16), (1000, 16), (2000, 16),
+    (2, 32), (50, 32), (100, 32), (500, 32), (1000, 32), (2000, 32),
+    (2, 64), (50, 64), (100, 64), (500, 64), (1000, 64), (2000, 64)
 ])
 def test_secret_addition(nb_secret_addition, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
