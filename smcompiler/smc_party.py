@@ -86,7 +86,6 @@ class SMCParty:
         """
         Process an expression using the visitor pattern.
         """
-        print("Processing expression: " + str(expr))
 
         # Process the expression
 
