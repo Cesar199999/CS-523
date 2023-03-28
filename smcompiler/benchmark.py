@@ -38,7 +38,7 @@ def run_processes(expected, server_args, *client_args):
                for args in client_args]
 
     server.start()
-    time.sleep(1)  # Otherwise tests take so long
+    time.sleep(4)
     for client in clients:
         client.start()
 
@@ -53,7 +53,7 @@ def run_processes(expected, server_args, *client_args):
     server.join()
 
     # To "ensure" the workers are dead.
-    time.sleep(1)  # Otherwise tests take so long
+    time.sleep(3)
 
     print("Server stopped.")
 
@@ -130,7 +130,7 @@ def experiment_secret_multiplications(nb_secret_multiplication=0, nb_parties=2, 
 
 
 def experiment_definition(nb_parties=2, bit_length=8, nb_scalar_addition=0, nb_scalar_multiplication=0, nb_secret_addition=0, nb_secret_multiplication=0):
-    sys.setrecursionlimit(10000)
+    sys.setrecursionlimit(20000)
 
     # Init random seed
     random.seed(time.time())
@@ -179,8 +179,7 @@ def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
     (2, 8), (50, 8), (100, 8), (500, 8), (1000, 8), (2000, 8),
     (2, 16), (50, 16), (100, 16), (500, 16), (1000, 16), (2000, 16),
     (2, 32), (50, 32), (100, 32), (500, 32), (1000, 32), (2000, 32),
-    (2, 64), (50, 64), (100, 64), (500, 64), (1000, 64), (2000, 64)
-])
+    (2, 64), (50, 64), (100, 64), (500, 64), (1000, 64), (2000, 64)])
 def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
                                                     nb_scalar_multiplication=nb_scalar_multiplication, nb_parties=nb_parties)
