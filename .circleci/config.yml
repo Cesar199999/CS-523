@@ -34,10 +34,10 @@ jobs:
           # app-dir: ~/smcompiler/
           pip-dependency-file: smcompiler/requirements.txt  # if you have a different name for your requirements file, maybe one that combines your runtime and test requirements.
       - run: | 
-            pytest benchmark.py -k 'test_scalar_addition' --benchmark-autosave --benchmark-sort=mean
-            pytest benchmark.py -k 'test_scalar_multiplication' --benchmark-autosave --benchmark-sort=mean
-            pytest benchmark.py -k 'test_secret_addition' --benchmark-autosave --benchmark-sort=mean
-            pytest benchmark.py -k 'test_secret_multiplication' --benchmark-autosave --benchmark-sort=mean
+            pytest smcompiler/benchmark.py -k 'test_scalar_addition' --benchmark-autosave --benchmark-sort=mean
+            pytest smcompiler/benchmark.py -k 'test_scalar_multiplication' --benchmark-autosave --benchmark-sort=mean
+            pytest smcompiler/benchmark.py -k 'test_secret_addition' --benchmark-autosave --benchmark-sort=mean
+            pytest smcompiler/benchmark.py -k 'test_secret_multiplication' --benchmark-autosave --benchmark-sort=mean
             pytest -m 
             
 # Invoke jobs via workflows
