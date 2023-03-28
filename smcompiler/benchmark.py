@@ -1,19 +1,13 @@
-"""
-Integration tests that verify different aspects of the protocol.
-You can *add* new tests here, but it is best to  add them to a new test file.
-
-ALL EXISTING TESTS IN THIS SUITE SHOULD PASS WITHOUT ANY MODIFICATION TO THEM.
-"""
-
 import time
 from multiprocessing import Process, Queue
 
 import pytest
 
-from expression import Scalar, Secret
+from expression import Expression, Scalar, Secret
 from protocol import ProtocolSpec
 from server import run
-from random import random
+import random
+import math
 
 from smc_party import SMCParty
 
@@ -35,14 +29,15 @@ def smc_server(args):
     run("localhost", 5000, args)
 
 
-def run_processes(server_args, *client_args):
+def run_processes(expected, server_args, *client_args):
     queue = Queue()
 
     server = Process(target=smc_server, args=(server_args,))
-    clients = [Process(target=smc_client, args=(*args, queue)) for args in client_args]
+    clients = [Process(target=smc_client, args=(*args, queue))
+               for args in client_args]
 
     server.start()
-    time.sleep(3)
+    time.sleep(1)  # Otherwise tests take so long
     for client in clients:
         client.start()
 
@@ -57,128 +52,147 @@ def run_processes(server_args, *client_args):
     server.join()
 
     # To "ensure" the workers are dead.
-    time.sleep(2)
+    time.sleep(1)  # Otherwise tests take so long
 
     print("Server stopped.")
 
-    return results
+    for result in results:
+        assert result == expected
 
 
-def suite(parties, expr):
+def suite(parties, expr, expected, benchmark):
+
     participants = list(parties.keys())
     prot = ProtocolSpec(expr=expr, participant_ids=participants)
-    clients = [(name, prot, value_dict) for name, value_dict in parties.items()]
-    results = run_processes(participants, *clients)
-    return results
 
-def experiment_definition(nb_scalar_addition=0, nb_secret_addition=0, nb_scalar_multiplication=0, nb_secret_multiplication=0, nb_parties=2):
-    
-    #generate 2 secrets by default
-    secrets = [Secret() for _ in range(2)]
+    clients = [(name, prot, value_dict)
+               for name, value_dict in parties.items()]
 
-    parties = {'Party_{}'.format(i+1): {secrets[i]:i} if i < 2 else {} for i in range(nb_parties)}
+    benchmark(run_processes, expected, participants, *clients)
 
-    expr = Scalar(0)
+
+def get_parties(nb_parties=2):
+    parties = {}
+
+    for i in range(nb_parties):
+        parties[f"party{i}"] = dict()
+
+    return parties
+
+
+def get_random_values(nb_values: int, bit_length: int) -> list[int]:
+    return [int(random.random() * (2 ** bit_length)) for _ in range(nb_values)]
+
+
+def experiment_scalar_additions(nb_scalar_addition=0, nb_parties=2, bit_length=32):
+
+    parties = get_parties(nb_parties)
+    values = get_random_values(nb_scalar_addition, bit_length)
+    scalars = [Scalar(v) for v in values]
+
+    return parties, sum(scalars[1:], start=scalars[0]), sum(values)
+
+
+def experiment_scalar_multiplications(nb_scalar_multiplication=0, nb_parties=2, bit_length=32):
+
+    parties = get_parties(nb_parties)
+    values = get_random_values(nb_scalar_multiplication, bit_length)
+    scalars = [Scalar(v) for v in values]
+
+    return parties, math.prod(scalars[1:], start=scalars[0]), math.prod(values)
+
+
+def experiment_secret_additions(nb_secret_addition=0, nb_parties=2, bit_length=32):
+
+    parties = get_parties(nb_parties)
+    values = get_random_values(nb_secret_addition, bit_length)
+    secrets = [Secret() for _ in values]
+
+    for secret, value in zip(secrets, values):
+        party = f"party{int(random.random()  * nb_parties)}"
+        parties[party][secret] = value
+
+    return parties, sum(secrets[1:], start=secrets[0]), sum(values)
+
+
+def experiment_secret_multiplications(nb_secret_multiplication=0, nb_parties=2, bit_length=32):
+
+    parties = get_parties(nb_parties)
+    values = get_random_values(nb_secret_multiplication, bit_length)
+    secrets = [Secret() for _ in values]
+
+    for secret, value in zip(secrets, values):
+        party = f"party{int(random.random()  * nb_parties)}"
+        parties[party][secret] = value
+
+    return parties, math.prod(secrets[1:], start=secrets[0]), math.prod(values)
+
+
+def experiment_definition(nb_parties=2, bit_length=32, nb_scalar_addition=0, nb_scalar_multiplication=0, nb_secret_addition=0, nb_secret_multiplication=0):
+
+    # Init random seed
+    random.seed(time.time())
 
     if nb_scalar_addition > 0:
-        for i in range(nb_scalar_addition):
-            expr+= Scalar(i+1)
-    
-    if nb_scalar_multiplication > 0:
-        expr = Scalar(1)    
-        for i in range(nb_scalar_multiplication):
-           expr *= Scalar(1 if random() < 0.99 else 2)
+        return experiment_scalar_additions(
+            nb_scalar_addition=nb_scalar_addition, nb_parties=nb_parties, bit_length=bit_length)
 
-    if nb_secret_addition > 0 or nb_secret_multiplication > 0:
-        expr = secrets[0]
-        for i in range(nb_secret_addition):
-            expr += Secret()
+    elif nb_scalar_multiplication > 0:
+        return experiment_scalar_multiplications(
+            nb_scalar_multiplication=nb_scalar_multiplication, nb_parties=nb_parties, bit_length=bit_length)
 
-        for i in range(nb_secret_multiplication):
-            expr *= Secret()
+    elif nb_secret_addition > 1:
+        return experiment_secret_additions(
+            nb_secret_addition=nb_secret_addition, nb_parties=nb_parties, bit_length=bit_length)
 
-    return(parties, expr)
+    elif nb_secret_multiplication > 1:
+        return experiment_secret_multiplications(
+            nb_secret_multiplication=nb_secret_multiplication, nb_parties=nb_parties, bit_length=bit_length)
 
-def test_scalar_addition_10(benchmark):
-    parties, expr = experiment_definition(nb_scalar_addition=10)
-    benchmark(suite,parties, expr)
+    else:
+        raise ValueError("No experiment defined")
 
-def test_scalar_addition_100(benchmark):
-    parties, expr = experiment_definition(nb_scalar_addition=100)
-    benchmark(suite,parties, expr)
 
-def test_scalar_addition_500(benchmark):
-    parties, expr = experiment_definition(nb_scalar_addition=500)
-    benchmark(suite,parties, expr)
+@pytest.mark.parametrize("nb_scalar_addition, nb_parties, bit_length", [
+    (2, 2, 8), (10, 2, 8), (100, 2, 8),
+    (2, 4, 8), (10, 4, 8), (100, 4, 8),
+    (2, 8, 8), (10, 8, 8), (100, 8, 8)
+])
+def test_scalar_addition(benchmark, nb_scalar_addition, nb_parties, bit_length):
+    parties, expr, expected = experiment_definition(
+        nb_scalar_addition=nb_scalar_addition, nb_parties=nb_parties, bit_length=bit_length)
+    suite(parties, expr, expected, benchmark)
 
-def test_scalar_addition_1000(benchmark):
-    parties, expr = experiment_definition(nb_scalar_addition=1000)
-    benchmark(suite,parties, expr)
 
-def test_scalar_multiplication_10(benchmark):
-    parties, expr = experiment_definition(nb_scalar_multiplication=10)
-    benchmark(suite,parties, expr)
+@pytest.mark.parametrize("nb_scalar_multiplication, nb_parties, bit_length", [
+    (2, 2, 8), (10, 2, 8), (100, 2, 8),
+    (2, 4, 8), (10, 4, 8), (100, 4, 8),
+    (2, 8, 8), (10, 8, 8), (100, 8, 8)
+])
+def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, bit_length, benchmark):
+    parties, expr, expected = experiment_definition(
+        nb_scalar_multiplication=nb_scalar_multiplication, nb_parties=nb_parties, bit_length=bit_length)
+    suite(parties, expr, expected, benchmark)
 
-def test_scalar_multiplication_100(benchmark):
-    parties, expr = experiment_definition(nb_scalar_multiplication=100)
-    benchmark(suite,parties, expr)
 
-def test_scalar_multiplication_500(benchmark):
-    parties, expr = experiment_definition(nb_scalar_multiplication=500)
-    benchmark(suite,parties, expr)
+@pytest.mark.parametrize("nb_secret_addition, nb_parties, bit_length", [
+    (2, 2, 8), (10, 2, 8), (100, 2, 8),
+    (2, 4, 8), (10, 4, 8), (100, 4, 8),
+    (2, 8, 8), (10, 8, 8), (100, 8, 8)
+])
+def test_secret_addition(nb_secret_addition, nb_parties, bit_length, benchmark):
+    parties, expr, expected = experiment_definition(
+        nb_secret_addition=nb_secret_addition, nb_parties=nb_parties, bit_length=bit_length)
+    suite(parties, expr, expected, benchmark)
 
-def test_scalar_multiplication_1000(benchmark):
-    parties, expr = experiment_definition(nb_scalar_multiplication=1000)
-    benchmark(suite,parties, expr)
 
-def test_ecretr_addition_10(benchmark):
-    parties, expr = experiment_definition(nb_secret_addition=10)
-    benchmark(suite, parties, expr)
-
-def test_secret_addition_100(benchmark):
-    parties, expr = experiment_definition(nb_secretaddition=100)
-    benchmark(suite, parties, expr)
-
-def test_secret_addition_500(benchmark):
-    parties, expr = experiment_definition(nb_secretaddition=500)
-    benchmark(suite, parties, expr)
-
-def test_secret_addition_1000(benchmark):
-    parties, expr = experiment_definition(nb_secretaddition=1000)
-    benchmark(suite, parties, expr)
-
-def test_secret_multiplication_10(benchmark):
-    parties, expr = experiment_definition(nb_secretmultiplication=10)
-    benchmark(suite, parties, expr)
-
-def test_secret_multiplication_100(benchmark):
-    parties, expr = experiment_definition(nb_secretmultiplication=100)
-    benchmark(suite, parties, expr)
-
-def test_secret_multiplication_500(benchmark):
-    parties, expr = experiment_definition(nb_secretmultiplication=500)
-    benchmark(suite, parties, expr)
-
-def test_secret_multiplication_1000(benchmark):
-    parties, expr = experiment_definition(nb_secretmultiplication=1000)
-    benchmark(suite, parties, expr)
-
-def test_parties_4(benchmark):
-    parties, expr = experiment_definition(nb_parties=4, nb_scalar_addition=1)
-    benchmark(suite, parties, expr)
-
-def test_parties_8(benchmark):
-    parties, expr = experiment_definition(nb_parties=8, nb_scalar_addition=1)
-    benchmark(suite, parties, expr)
-
-def test_parties_16(benchmark):
-    parties, expr = experiment_definition(nb_parties=16, nb_scalar_addition=1)
-    benchmark(suite, parties, expr)
-
-def test_parties_32(benchmark):
-    parties, expr = experiment_definition(nb_parties=32, nb_scalar_addition=1)
-    benchmark(suite, parties, expr)
-
-def test_parties_64(benchmark):
-    parties, expr = experiment_definition(nb_parties=64, nb_scalar_addition=1)
-    benchmark(suite, parties, expr)
+@pytest.mark.parametrize("nb_secret_multiplication, nb_parties, bit_length", [
+    # max nb_secret_multiplication is 50, otherwise the cardinality of the field is too small.
+    (2, 2, 8), (10, 2, 8), (50, 2, 8),
+    (2, 4, 8), (10, 4, 8), (50, 4, 8),
+    (2, 8, 8), (10, 8, 8), (50, 8, 8)
+])
+def test_secret_multiplication(nb_secret_multiplication, nb_parties, bit_length, benchmark):
+    parties, expr, expected = experiment_definition(
+        nb_secret_multiplication=nb_secret_multiplication, nb_parties=nb_parties, bit_length=bit_length)
+    suite(parties, expr, expected, benchmark)

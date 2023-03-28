@@ -64,6 +64,10 @@ class SMCParty:
         # Get the share after multiparty computation.
         share = self.process_expression(self.protocol_spec.expr)
 
+        # If the share is an integer there were no secrets in the expression.
+        if isinstance(share, int):
+            return share
+
         # Send the share to the server.
         self.comm.publish_message(
             "final share: " + self.client_id, share.serialize())
