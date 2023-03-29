@@ -158,12 +158,7 @@ def experiment_definition(nb_parties=2, bit_length=8, nb_scalar_addition=0, nb_s
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_addition' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_scalar_addition, nb_parties", [
-    (2, 2), (50, 2), (100, 2), (500, 2), (1000, 2), (2000, 2),
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4),
-    (2, 8), (50, 8), (100, 8), (500, 8), (1000, 8), (2000, 8),
-    (2, 16), (50, 16), (100, 16), (500, 16), (1000, 16), (2000, 16),
-    (2, 32), (50, 32), (100, 32), (500, 32), (1000, 32), (2000, 32),
-    (2, 64), (50, 64), (100, 64), (500, 64), (1000, 64), (2000, 64)
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4)
 ])
 def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -174,11 +169,7 @@ def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_multiplication' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_scalar_multiplication, nb_parties", [
-    (2, 2), (50, 2), (100, 2), (500, 2), (1000, 2),
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4),
-    (2, 8), (50, 8), (100, 8), (500, 8), (1000, 8),
-    (2, 16), (50, 16), (100, 16), (500, 16), (1000, 16),
-    (2, 32), (50, 32), (100, 32), (500, 32), (1000, 32)
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4)
 ])
 def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -189,11 +180,9 @@ def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
 ### Run with python3 -m pytest benchmark.py -k 'test_secret_addition' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_secret_addition, nb_parties", [
-    (2, 2), (50, 2), (100, 2), (500, 2), (1000, 2),
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4),
-    (2, 8), (50, 8), (100, 8), (500, 8), (1000, 8),
-    (2, 16), (50, 16), (100, 16), (500, 16), (1000, 16),
-    (2, 32), (50, 32), (100, 32), (500, 32), (1000, 32),
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4),
+    # Varying the number of parties.
+    (2, 2), (2, 4), (2, 8), (2, 16), (2, 32), (2, 64)
 ])
 def test_secret_addition(nb_secret_addition, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -205,12 +194,9 @@ def test_secret_addition(nb_secret_addition, nb_parties, benchmark):
 
 @pytest.mark.parametrize("nb_secret_multiplication, nb_parties", [
     # max bit length of (nb_secret_multiplication * bit_length) before overflow modulo p is 1024
-    (2, 2), (10, 2), (20, 2), (40, 2), (80, 2),
     (2, 4), (10, 4), (20, 4), (40, 4), (80, 4),
-    (2, 8), (10, 8), (20, 8), (40, 8), (80, 8),
-    (2, 16), (10, 16), (20, 16), (40, 16), (80, 16),
-    (2, 32), (10, 32), (20, 32), (40, 32), (80, 32),
-    (2, 64), (10, 64), (20, 64), (40, 64), (80, 64),
+    # Varying number of parties.
+    (2, 2), (2, 4), (2, 8), (2, 16), (2, 32), (2, 64)
 ])
 def test_secret_multiplication(nb_secret_multiplication, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(
