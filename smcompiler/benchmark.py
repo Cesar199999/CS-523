@@ -91,7 +91,12 @@ def experiment_scalar_additions(nb_scalar_addition=0, nb_parties=2, bit_length=3
     values = get_random_values(nb_scalar_addition, bit_length)
     scalars = [Scalar(v) for v in values]
 
-    return parties, sum(scalars[1:], start=scalars[0]), sum(values)
+    values += get_random_values(1, bit_length)
+    secret = Secret()
+    parties[f"party{0}"][secret] = values[-1]
+
+    # We add an extra secret to the list to make sure share exchange happens.
+    return parties, secret + sum(scalars[1:], start=scalars[0]), sum(values)
 
 
 def experiment_scalar_multiplications(nb_scalar_multiplication=0, nb_parties=2, bit_length=32):
@@ -100,7 +105,12 @@ def experiment_scalar_multiplications(nb_scalar_multiplication=0, nb_parties=2, 
     values = get_random_values(nb_scalar_multiplication, bit_length)
     scalars = [Scalar(v) for v in values]
 
-    return parties, math.prod(scalars[1:], start=scalars[0]), math.prod(values)
+    values += get_random_values(1, bit_length)
+    secret = Secret()
+    parties[f"party{0}"][secret] = values[-1]
+
+    # We add an extra secret to the list to make sure share exchange happens.
+    return parties, secret * math.prod(scalars[1:], start=scalars[0]), math.prod(values)
 
 
 def experiment_secret_additions(nb_secret_addition=0, nb_parties=2, bit_length=32):
@@ -158,7 +168,7 @@ def experiment_definition(nb_parties=2, bit_length=8, nb_scalar_addition=0, nb_s
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_addition' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_scalar_addition, nb_parties", [
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4)
+    (2, 4), (50, 4), (100, 42), (500, 4), (1000, 4)
 ])
 def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -168,8 +178,8 @@ def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
 
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_multiplication' --benchmark-autosave --benchmark-sort=mean ###
 
-@pytest.mark.parametrize("nb_scalar_multiplication, nb_parties", [
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4)
+@ pytest.mark.parametrize("nb_scalar_multiplication, nb_parties", [
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4)
 ])
 def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -179,8 +189,8 @@ def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
 
 ### Run with python3 -m pytest benchmark.py -k 'test_secret_addition' --benchmark-autosave --benchmark-sort=mean ###
 
-@pytest.mark.parametrize("nb_secret_addition, nb_parties", [
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4), (2000, 4),
+@ pytest.mark.parametrize("nb_secret_addition, nb_parties", [
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4),
     # Varying the number of parties.
     (2, 2), (2, 4), (2, 8), (2, 16), (2, 32), (2, 64)
 ])
@@ -192,7 +202,7 @@ def test_secret_addition(nb_secret_addition, nb_parties, benchmark):
 
 ### Run with python3 -m pytest benchmark.py -k 'test_secret_multiplication' --benchmark-autosave --benchmark-sort=mean ###
 
-@pytest.mark.parametrize("nb_secret_multiplication, nb_parties", [
+@ pytest.mark.parametrize("nb_secret_multiplication, nb_parties", [
     # max bit length of (nb_secret_multiplication * bit_length) before overflow modulo p is 1024
     (2, 4), (10, 4), (20, 4), (40, 4), (80, 4),
     # Varying number of parties.
