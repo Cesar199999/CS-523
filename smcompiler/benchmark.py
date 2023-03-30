@@ -82,7 +82,13 @@ def get_parties(nb_parties=2):
 
 
 def get_random_values(nb_values: int, bit_length: int) -> list[int]:
-    return [int(random.random() * (2 ** bit_length)) for _ in range(nb_values)]
+    res = []
+    for _ in range(nb_values):
+        r = random.getrandbits(bit_length)
+        while r == 0:
+            r = random.getrandbits(bit_length)
+        res.append(r)
+    return res
 
 
 def experiment_scalar_additions(nb_scalar_addition=0, nb_parties=2, bit_length=32):
@@ -149,11 +155,11 @@ def experiment_definition(nb_parties=2, bit_length=8, nb_scalar_addition=0, nb_s
         return experiment_scalar_additions(
             nb_scalar_addition=nb_scalar_addition, nb_parties=nb_parties, bit_length=bit_length)
 
-    elif nb_scalar_multiplication > 0:
+    elif nb_scalar_multiplication > 1:
         return experiment_scalar_multiplications(
             nb_scalar_multiplication=nb_scalar_multiplication, nb_parties=nb_parties, bit_length=bit_length)
 
-    elif nb_secret_addition > 1:
+    elif nb_secret_addition > 0:
         return experiment_secret_additions(
             nb_secret_addition=nb_secret_addition, nb_parties=nb_parties, bit_length=bit_length)
 
@@ -168,7 +174,7 @@ def experiment_definition(nb_parties=2, bit_length=8, nb_scalar_addition=0, nb_s
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_addition' --benchmark-autosave --benchmark-sort=mean ###
 
 @pytest.mark.parametrize("nb_scalar_addition, nb_parties", [
-    (2, 4), (50, 4), (100, 42), (500, 4), (1000, 4)
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4)
 ])
 def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -179,11 +185,11 @@ def test_scalar_addition(nb_scalar_addition, nb_parties, benchmark):
 ### Run with python3 -m pytest benchmark.py -k 'test_scalar_multiplication' --benchmark-autosave --benchmark-sort=mean ###
 
 @ pytest.mark.parametrize("nb_scalar_multiplication, nb_parties", [
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4)
+    (2, 4), (10, 4), (20, 4), (40, 4), (80, 4),
 ])
 def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
-    parties, expr, expected = experiment_definition(bit_length=16,
-                                                    nb_scalar_multiplication=nb_scalar_multiplication, nb_parties=nb_parties)
+    parties, expr, expected = experiment_definition(
+        nb_scalar_multiplication=nb_scalar_multiplication, nb_parties=nb_parties)
     suite(parties, expr, expected, benchmark)
 
 
