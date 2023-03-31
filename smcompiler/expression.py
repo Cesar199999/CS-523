@@ -27,6 +27,7 @@ def gen_id() -> bytes:
 class Expression:
     """
     Base class for an arithmetic expression.
+    Is abstract and should not be instantiated.
     """
 
     def __init__(
@@ -63,7 +64,7 @@ class Scalar(Expression):
         super().__init__(id)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({repr(self.value)})"
+        return f"Scalar({repr(self.value)})"
 
     def __hash__(self):
         return hash(self.value)
@@ -82,7 +83,7 @@ class Secret(Expression):
 
     def __repr__(self):
         return (
-            f"{self.__class__.__name__}({self.value if self.value is not None else ''})"
+            f"Secret({self.value if self.value is not None else ''})"
         )
 
 
@@ -92,12 +93,11 @@ class Add(Expression):
     def __init__(
         self,
         left: Expression,
-        right: Expression,
-        id: Optional[bytes] = None
+        right: Expression
     ):
         self.left = left
         self.right = right
-        super().__init__(id)
+        super().__init__(merge_ids(left.id, right.id, "+"))
 
     def __repr__(self):
         return f"({repr(self.left)} + {repr(self.right)})"
@@ -109,12 +109,20 @@ class Mul(Expression):
     def __init__(
         self,
         left: Expression,
-        right: Expression,
-        id: Optional[bytes] = None
+        right: Expression
     ):
         self.left = left
         self.right = right
-        super().__init__(id)
+        super().__init__(merge_ids(left.id, right.id, "*"))
 
     def __repr__(self):
         return f"({repr(self.left)} * {repr(self.right)})"
+
+
+def merge_ids(left: bytes, right: bytes, op: str) -> bytes:
+    return base64.b64encode(
+        bytearray(
+            ((left[i] + right[i]) % 256 if op == "+" else (left[i] * right[i]) % 256
+             for i in range(ID_BYTES))
+        )
+    )

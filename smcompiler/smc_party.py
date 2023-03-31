@@ -54,7 +54,7 @@ class SMCParty:
         self.client_id = client_id
         self.protocol_spec = protocol_spec
         self.value_dict = value_dict
-        self.share_dict: Dict[Secret, Share] = {}
+        self.share_dict: Dict[Expression, Union[Share, int]] = {}
 
     def run(self) -> int:
         """
@@ -87,7 +87,9 @@ class SMCParty:
         Process an expression using the visitor pattern.
         """
 
-        # Process the expression
+        # If the expression has already been processed, return the result from the cache.
+        if expr in self.share_dict:
+            return self.share_dict[expr]
 
         if isinstance(expr, Add):
             return self.process_add(expr)
@@ -129,10 +131,14 @@ class SMCParty:
             value_y_b = self.retrieve_and_reconstruct(
                 "share: y - b multiplication: " + expr.id.hex())
 
+            self.share_dict[expr] = share_c + value_y_b * share_x + value_x_a * share_y - \
+                value_x_a * value_y_b * \
+                int(self.client_id == min(self.protocol_spec.participant_ids))
             # Compute and return the result, add extra term iff this party is the first party.
-            return share_c + value_y_b * share_x + value_x_a * share_y - value_x_a * value_y_b * int(self.client_id == min(self.protocol_spec.participant_ids))
+            return self.share_dict[expr]
 
-        return share_x * share_y
+        self.share_dict[expr] = share_x * share_y
+        return self.share_dict[expr]
 
     def process_add(self, expr: Add) -> Union[Share, int]:
         """
@@ -148,42 +154,42 @@ class SMCParty:
         if not self.client_id == min(self.protocol_spec.participant_ids) and (isinstance(share_x, Share) or isinstance(share_y, Share)):
 
             if isinstance(share_x, int):
+                self.share_dict[expr] = share_y
                 return share_y
 
             if isinstance(share_y, int):
+                self.share_dict[expr] = share_x
                 return share_x
 
         # Standard share addition.
-        return share_x + share_y
+        self.share_dict[expr] = share_x + share_y
+        return self.share_dict[expr]
 
     def process_secret(self, expr: Secret) -> Share:
         """
         Process a Secret expression.
         """
 
-        # If the secret has not been shared yet, share it.
-        if expr not in self.share_dict:
+        # If this party has the secret, share it.
+        if expr in self.value_dict:
 
-            # If this party has the secret, share it.
-            if expr in self.value_dict:
+            # Compute shares.
+            shares = share_secret(self.value_dict[expr], len(
+                self.protocol_spec.participant_ids))
 
-                # Compute shares.
-                shares = share_secret(self.value_dict[expr], len(
-                    self.protocol_spec.participant_ids))
+            # Send shares to other parties.
+            for client_id, share in zip(self.protocol_spec.participant_ids, shares):
 
-                # Send shares to other parties.
-                for client_id, share in zip(self.protocol_spec.participant_ids, shares):
-
-                    # Skip if the client is this client.
-                    if client_id == self.client_id:
-                        self.share_dict[expr] = share
-                    else:
-                        self.comm.send_private_message(
-                            client_id, "share " + expr.id.hex(), share.serialize())
-            else:
-                # Otherwise, retrieve the share from another party's secret.
-                self.share_dict[expr] = Share.deserialize(
-                    self.comm.retrieve_private_message("share " + expr.id.hex()))
+                # Skip if the client is this client.
+                if client_id == self.client_id:
+                    self.share_dict[expr] = share
+                else:
+                    self.comm.send_private_message(
+                        client_id, "share " + expr.id.hex(), share.serialize())
+        else:
+            # Otherwise, retrieve the share from another party's secret.
+            self.share_dict[expr] = Share.deserialize(
+                self.comm.retrieve_private_message("share " + expr.id.hex()))
 
         # Return the share in the share dictionary.
         return self.share_dict[expr]

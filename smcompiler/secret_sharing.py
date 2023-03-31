@@ -14,6 +14,7 @@ class UniquePrime():
     """ Wrapper class to fix a unique prime number at runtime.
         This is used to ensure that the same prime number is used for all shares.
     """
+    # Value must be changed to 1024 bits in order to run the benchmarks.
     __unique_prime = bn.Bn.get_prime(1024).int(
     )  # After 1024 bits a Segmentation Fault occurs.
 
