@@ -196,9 +196,7 @@ def test_scalar_multiplication(nb_scalar_multiplication, nb_parties, benchmark):
 ### Run with python3 -m pytest benchmark.py -k 'test_secret_addition' --benchmark-autosave --benchmark-sort=mean ###
 
 @ pytest.mark.parametrize("nb_secret_addition, nb_parties", [
-    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4),
-    # Varying the number of parties.
-    (2, 2), (2, 4), (2, 8), (2, 16), (2, 32), (2, 64)
+    (2, 4), (50, 4), (100, 4), (500, 4), (1000, 4)
 ])
 def test_secret_addition(nb_secret_addition, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(bit_length=16,
@@ -210,11 +208,26 @@ def test_secret_addition(nb_secret_addition, nb_parties, benchmark):
 
 @ pytest.mark.parametrize("nb_secret_multiplication, nb_parties", [
     # max bit length of (nb_secret_multiplication * bit_length) before overflow modulo p is 1024
-    (2, 4), (10, 4), (20, 4), (40, 4), (80, 4),
-    # Varying number of parties.
-    (2, 2), (2, 4), (2, 8), (2, 16), (2, 32), (2, 64)
+    (2, 4), (10, 4), (20, 4), (40, 4), (80, 4)
 ])
 def test_secret_multiplication(nb_secret_multiplication, nb_parties, benchmark):
     parties, expr, expected = experiment_definition(
         nb_secret_multiplication=nb_secret_multiplication, nb_parties=nb_parties)
+    suite(parties, expr, expected, benchmark)
+
+@ pytest.mark.parametrize("nb_secret_multiplication, nb_parties", [
+    # max bit length of (nb_secret_multiplication * bit_length) before overflow modulo p is 1024
+    (2, 2), (2, 4), (2, 8), (2, 16), (2, 32), (2, 64)
+])
+def test_nb_parties_multiplication(nb_secret_multiplication, nb_parties, benchmark):
+    parties, expr, expected = experiment_definition(
+        nb_secret_multiplication=nb_secret_multiplication, nb_parties=nb_parties)
+    suite(parties, expr, expected, benchmark)
+
+@ pytest.mark.parametrize("nb_secret_addition, nb_parties", [
+    (2, 2), (2, 4), (2, 8), (2, 16), (2, 32), (2, 64)
+])
+def test_nb_parties_addition(nb_secret_addition, nb_parties, benchmark):
+    parties, expr, expected = experiment_definition(bit_length=16,
+                                                    nb_secret_addition=nb_secret_addition, nb_parties=nb_parties)
     suite(parties, expr, expected, benchmark)
