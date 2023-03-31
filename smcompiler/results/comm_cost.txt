@@ -1,0 +1,32 @@
+addition_nb_parties[2-2]: 116827
+addition_nb_parties[2-4]: 437649
+addition_nb_parties[2-8]: 1303168
+addition_nb_parties[2-16]:4150940
+addition_nb_parties[2-32]:14313350
+addition_nb_parties[2-64]:52941005
+multiplication_nb_parties[2-2]: 326038
+multiplication_nb_parties[2-4]: 1007468
+multiplication_nb_parties[2-8]: 3088971
+multiplication_nb_parties[2-16]:10900313
+multiplication_nb_parties[2-32]:40080773
+multiplication_nb_parties[2-64]:153913522
+scalar_addition[2-4]:   337324
+scalar_addition[50-4]:  337333
+scalar_addition[100-4]: 338487
+scalar_addition[500-4]: 342128
+scalar_addition[1000-4]:345764
+scalar_multiplication[2-4]: 337341
+scalar_multiplication[10-4]:337260
+scalar_multiplication[20-4]:338504
+scalar_multiplication[40-4]:338504
+scalar_multiplication[80-4]:337259
+secret_addition[2-4]:   441337
+secret_addition[50-4]:  4735544
+secret_addition[100-4]: 8912649
+secret_addition[500-4]: 43651123
+secret_addition[1000-4]:87151250
+secret_multiplication[2-4]: 1011423
+secret_multiplication[10-4]:6186615
+secret_multiplication[20-4]:12700553
+secret_multiplication[40-4]:25721117
+secret_multiplication[80-4]:51670020
