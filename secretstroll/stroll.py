@@ -3,7 +3,6 @@ Classes that you need to complete.
 """
 
 from binascii import hexlify
-from typing import Any, Dict, List, Union, Tuple
 from credential import *
 
 # Optional import
@@ -28,7 +27,7 @@ class Server:
 
     @staticmethod
     def generate_ca(
-        subscriptions: List[str]
+            subscriptions: List[str]
     ) -> Tuple[bytes, bytes]:
         """Initializes the credential system. Runs exactly once in the
         beginning. Decides on schemes public parameters and choses a secret key
@@ -46,23 +45,22 @@ class Server:
             should be encoded as bytes.
         """
 
-        # Issuer subscription map
-        Server.subscriptionMap = {subscription: i for i,
-                                  subscription in enumerate(subscriptions)}
+        # Issuer subscription map, maps attributes to their index
+        subscriptionMap = {subscription: i for i, subscription in enumerate(subscriptions)}
 
         # Generate key pair
         sk, pk = generate_key(subscriptions)
 
         # return the server's secret key and public information
-        return jsonpickle.encode(sk), jsonpickle.encode(pk)
+        return bytes(jsonpickle.encode(sk), 'utf-8'), bytes(jsonpickle.encode((pk, subscriptionMap), keys=True), 'utf-8')
 
     def process_registration(
-        self,
-        server_sk: bytes,
-        server_pk: bytes,
-        issuance_request: bytes,
-        username: str,
-        subscriptions: List[str]
+            self,
+            server_sk: bytes,
+            server_pk: bytes,
+            issuance_request: bytes,
+            username: str,
+            subscriptions: List[str]
     ) -> bytes:
         """ Registers a new account on the server.
 
@@ -78,16 +76,19 @@ class Server:
                 credential with this response).
         """
 
-        # Deserialize the server's secret and public keys
-        sk: SecretKey = jsonpickle.decode(server_sk)
-        pk: PublicKey = jsonpickle.decode(server_pk)
+        # Deserialize the server's public key and subscription map
+        tmp: Tuple[PublicKey, Dict[str, int]] = jsonpickle.decode(server_pk.decode('utf-8'), keys=True)
+        pk, subscriptionMap = tmp
+
+        # Deserialize the server's secret key
+        sk: SecretKey = jsonpickle.decode(server_sk.decode('utf-8'))
 
         # Deserialize the issuance request
-        issue_request: IssueRequest = jsonpickle.decode(issuance_request)
+        issue_request: IssueRequest = jsonpickle.decode(issuance_request.decode('utf-8'))
 
         # Issuer subscription map, maps issuer chosen attributes to their index
         issuer_attributes = {i: hexlify(G1.order().random().binary(
-        )) for i in set(Server.subscriptionMap.values()) - issue_request[1][2]}
+        )) for i in set(subscriptionMap.values()) - issue_request[1][2]}
 
         # Remember the issuer attributes
         self.users_issuer_attributes[username] = issuer_attributes
@@ -97,14 +98,14 @@ class Server:
             sk, pk, issue_request, issuer_attributes)
 
         # Return the signed issue request
-        return jsonpickle.encode(signed_issue_request)
+        return bytes(jsonpickle.encode(signed_issue_request), 'utf-8')
 
     def check_request_signature(
-        self,
-        server_pk: bytes,
-        message: bytes,
-        revealed_attributes: List[str],
-        signature: bytes
+            self,
+            server_pk: bytes,
+            message: bytes,
+            revealed_attributes: List[str],
+            signature: bytes
     ) -> bool:
         """ Verify the signature on the location request
 
@@ -117,10 +118,11 @@ class Server:
         Returns:
             whether a signature is valid
         """
+        # Deserialize the server's public key and subscription map
+        pk: PublicKey = jsonpickle.decode(server_pk.decode('utf-8'), keys=True)[0]
 
         # Verify the signature
-        return verify_disclosure_proof(jsonpickle.decode(server_pk),  jsonpickle.decode(
-            signature, keys=True), message)
+        return verify_disclosure_proof(pk, jsonpickle.decode(signature.decode('utf-8'), keys=True), message)
 
 
 class Client:
@@ -136,10 +138,10 @@ class Client:
         self.anonymous_credential = None
 
     def prepare_registration(
-        self,
-        server_pk: bytes,
-        username: str,
-        subscriptions: List[str]
+            self,
+            server_pk: bytes,
+            username: str,
+            subscriptions: List[str]
     ) -> Tuple[bytes, State]:
         """Prepare a request to register a new account on the server.
 
@@ -156,25 +158,27 @@ class Client:
                 You need to design the state yourself.
         """
 
-        # Deserialize the server's public key
-        pk: PublicKey = jsonpickle.decode(server_pk)
+        # Deserialize the server's public key and subscription map
+        tmp: Tuple[PublicKey, Dict[str, int]] = jsonpickle.decode(server_pk.decode('utf-8'), keys=True)
+        pk, subscriptionMap = tmp
 
         # Get random keys for each subscription
-        user_attributes = {Server.subscriptionMap[subscription]: hexlify(G1.order().random().binary())
+        user_attributes = {subscriptionMap[subscription]: hexlify(G1.order().random().binary())
                            for subscription in subscriptions}
+        user_attributes[subscriptionMap["username"]] = username.encode('utf-8')
 
         # Create the issue request
         issue_request: IssueRequest = create_issue_request(
             pk, user_attributes, self.user_state)
 
         # Return the issue request and the private state
-        return jsonpickle.encode(issue_request), self.user_state
+        return bytes(jsonpickle.encode(issue_request), 'utf-8'), self.user_state
 
     def process_registration_response(
-        self,
-        server_pk: bytes,
-        server_response: bytes,
-        private_state: State
+            self,
+            server_pk: bytes,
+            server_response: bytes,
+            private_state: State
     ) -> bytes:
         """Process the response from the server.
 
@@ -188,12 +192,13 @@ class Client:
             credentials: create an attribute-based credential for the user
         """
 
-        # Deserialize the server's public key
-        pk: PublicKey = jsonpickle.decode(server_pk)
+        # Deserialize the server's public key and subscription map
+        tmp: Tuple[PublicKey, Dict[str, int]] = jsonpickle.decode(server_pk.decode('utf-8'), keys=True)
+        pk, subscriptionMap = tmp
 
         # Deserialize the server's response, int keys are deserialized as strings
         signed_issue_request: BlindSignature = jsonpickle.decode(
-            server_response)
+            server_response.decode('utf-8'))
 
         issuer_attributes = {
             int(k): v for k, v in signed_issue_request[1].items()}
@@ -203,14 +208,14 @@ class Client:
             pk, (signed_issue_request[0], issuer_attributes), private_state)
 
         # Serialize the credential
-        return jsonpickle.encode(credential, keys=True)
+        return bytes(jsonpickle.encode(credential, keys=True), 'utf-8')
 
     def sign_request(
-        self,
-        server_pk: bytes,
-        credentials: bytes,
-        message: bytes,
-        types: List[str]
+            self,
+            server_pk: bytes,
+            credentials: bytes,
+            message: bytes,
+            types: List[str]
     ) -> bytes:
         """Signs the request with the client's credential.
 
@@ -224,18 +229,19 @@ class Client:
             A message's signature (serialized)
         """
 
-        # Deserialize the server's public key
-        pk: PublicKey = jsonpickle.decode(server_pk)
+        # Deserialize the server's public key and subscription map
+        tmp: Tuple[PublicKey, Dict[str, int]] = jsonpickle.decode(server_pk.decode('utf-8'), keys=True)
+        pk, subscriptionMap = tmp
 
         # Deserialize the credential
         credential: AnonymousCredential = jsonpickle.decode(
-            credentials, keys=True)
+            credentials.decode('utf-8'), keys=True)
 
         # Unpack the credential
         full_attributes = credential[1]
 
         # Get subscription indices
-        subscription_indices = set(Server.subscriptionMap[t] for t in types)
+        subscription_indices = set(subscriptionMap[t] for t in types)
 
         # Get hidden attributes
         hidden_attributes = list(
@@ -246,4 +252,4 @@ class Client:
             pk, credential, hidden_attributes, message)
 
         # Return the signature
-        return jsonpickle.encode(disclosure_proof, keys=True)
+        return bytes(jsonpickle.encode(disclosure_proof, keys=True), 'utf-8')
