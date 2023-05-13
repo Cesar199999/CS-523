@@ -5,7 +5,7 @@ from stroll import Client, Server
 def test_process_registration_success():
 
     # Define subscriptions
-    subscriptions = ["A", "B", "C"]
+    subscriptions = ["A", "B", "C", "username"]
 
     # Generate key pair
     sk, pk = Server.generate_ca(subscriptions)

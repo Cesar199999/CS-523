@@ -16,27 +16,25 @@ the functions provided to resemble a more object-oriented interface.
 """
 
 from hashlib import sha256
-from typing import Any, List, Set, Tuple, Dict
+from typing import Any, List, Set, Tuple, Dict, Union
 
 from serialization import jsonpickle
 from petrelic.bn import Bn
 from petrelic.multiplicative.pairing import G1, G2, GT, G1Element, G2Element
 import math
 
-
 # Type hint aliases
 # Feel free to change them as you see fit.
 # Maybe at the end, you will not need aliases at all!
 SecretKey = Tuple[Bn, G1Element, List[Bn]]
-PublicKey = Tuple[G1Element, List[G1Element],
-                  G2Element, G2Element, List[G2Element]]
+PublicKey = Tuple[G1Element, List[G1Element], G2Element, G2Element, List[G2Element]]
 Signature = Tuple[G1Element, G1Element]
 Attribute = Any
 AttributeMap = Dict[int, Attribute]
-IssueRequest = Tuple[G1Element, Tuple[G1Element, List[Bn], Set[int]]]
+IssueRequest = Tuple[G1Element, Tuple[G1Element, Tuple[Dict[int, Bn], Bn]]]
 BlindSignature = Tuple[Tuple[G1Element, G1Element], AttributeMap]
 AnonymousCredential = Tuple[Signature, AttributeMap]
-DisclosureProof = Any
+DisclosureProof = Tuple[Tuple[G1Element, G1Element], Tuple[G1Element, G1Element, Dict[int, Bn], Bn], Dict[int, str]]
 
 
 ######################
@@ -45,7 +43,7 @@ DisclosureProof = Any
 
 
 def generate_key(
-    attributes: List[Attribute]
+        attributes: List[Attribute]
 ) -> Tuple[SecretKey, PublicKey]:
     """ Generate signer key pair """
 
@@ -66,8 +64,8 @@ def generate_key(
 
 
 def sign(
-    sk: SecretKey,
-    msgs: List[bytes]
+        sk: SecretKey,
+        msgs: List[bytes]
 ) -> Signature:
     """ Sign the vector of messages `msgs` """
 
@@ -82,9 +80,9 @@ def sign(
 
 
 def verify(
-    pk: PublicKey,
-    signature: Signature,
-    msgs: List[bytes]
+        pk: PublicKey,
+        signature: Signature,
+        msgs: List[bytes]
 ) -> bool:
     """ Verify the signature on a vector of messages """
 
@@ -99,8 +97,7 @@ def verify(
 
     # Verify signature
     return False if generator == G1.neutral_element() else \
-        generator.pair(math.prod(terms, start=X_tilde)
-                       ) == witness.pair(g_tilde)
+        generator.pair(math.prod(terms, start=X_tilde)) == witness.pair(g_tilde)
 
 
 #################################
@@ -124,9 +121,9 @@ class UserState:
 
 
 def create_issue_request(
-    pk: PublicKey,
-    user_attributes: AttributeMap,
-    user_state: UserState
+        pk: PublicKey,
+        user_attributes: AttributeMap,
+        user_state: UserState
 ) -> IssueRequest:
     """ Create an issuance request
 
@@ -152,18 +149,17 @@ def create_issue_request(
     commitment: G1Element = math.prod(terms, start=g ** user_state.t)
 
     # Compute witness, non-interactive proof pi applying Fiat-Shamir
-    pi_proof: Tuple[G1Element, List[Bn], Set[int]] = get_pi_proof(
-        commitment, pk, user_attributes, user_state.t)
+    pi_proof: Tuple[G1Element, Tuple[Dict[int, Bn], Bn]] = get_pi_proof(commitment, pk, user_attributes, user_state.t)
 
     # Compute and return request
     return commitment, pi_proof
 
 
 def sign_issue_request(
-    sk: SecretKey,
-    pk: PublicKey,
-    request: IssueRequest,
-    issuer_attributes: AttributeMap
+        sk: SecretKey,
+        pk: PublicKey,
+        request: IssueRequest,
+        issuer_attributes: AttributeMap
 ) -> BlindSignature:
     """ Create a signature corresponding to the user's request
 
@@ -192,9 +188,9 @@ def sign_issue_request(
 
 
 def obtain_credential(
-    pk: PublicKey,
-    response: BlindSignature,
-    user_state: UserState
+        pk: PublicKey,
+        response: BlindSignature,
+        user_state: UserState
 ) -> AnonymousCredential:
     """ Derive a credential from the issuer's response
 
@@ -205,8 +201,7 @@ def obtain_credential(
     (sigma_1, sigma_2), issuer_attributes = response
 
     # Get full attribute map
-    full_attributes: AttributeMap = {
-        **issuer_attributes, **user_state.user_attributes}
+    full_attributes: AttributeMap = {**issuer_attributes, **user_state.user_attributes}
 
     # Compute final signature
     final_signature: Signature = sigma_1, sigma_2 * sigma_1 ** (-user_state.t)
@@ -226,96 +221,100 @@ def verify_issue_request(request: IssueRequest, pk: PublicKey) -> bool:
     """ Verify that a pi proof is valid for a given commitment and public key """
 
     # Unpack request
-    commitment, (alpha, s, user_attributes_indices) = request
+    commitment, (alpha, (s, T)) = request
 
     # Get generator
     g = pk[0]
 
     # Get pks for user attributes
-    Y_u = [pk[1][i] for i in user_attributes_indices]
+    Y_u = {i: pk[1][i] for i in s.keys()}
 
     # Compute c
-    c = get_challenge(commitment, Y_u, alpha)
+    c = get_challenge(pk, commitment, Y_u, alpha)
 
     # Product terms
-    terms = [Y_i ** s_i for Y_i, s_i in zip(Y_u, s[1:])]
+    terms = [Y_u[i] ** s[i] for i in s.keys()]
 
     # Verify that it is a valid pi proof
-    return alpha * commitment ** c == math.prod(terms, start=g ** s[0])
+    return alpha * commitment ** c == math.prod(terms, start=g ** T)
 
 
-def get_pi_proof(commitment: G1Element, pk: PublicKey, user_attributes: AttributeMap, t: Bn) -> Tuple[G1Element, List[Bn], Set[int]]:
-    """ Compute pi proof of knowledge of t, (attribute_i)_{i in user_attributes}
-
+def get_pi_proof(commitment: G1Element, pk: PublicKey, user_attributes: AttributeMap, t: Bn) -> \
+        Tuple[G1Element, Tuple[Dict[int, Bn], Bn]]:
+    """ Computes pi proof of knowledge of t, (attribute_i)_{i in user_attributes}
         This pi proof is computed using Fiat-Shamir, if n is the number of attributes
-        in user_attributes then pi is defined as the tuple (alpha, s, Y_u) where
-        Y_u is a tuple of n elements (Y_u_1, ..., Y_u_n) where each Y_u_i corresponds
-        to the attribute_i public key.
+        in user_attributes then pi is defined as the tuple (alpha, (s, T)) where
 
         The constant alpha is then computed as follows:
-
             Compute a random Z_p element z_i for each attribute_i, and a random z_0
-
             alpha := g ** z_0 * Y_u_1 ** z_1 * ... * Y_u_n ** z_n
 
-        and s is a tuple of n + 1 elements (s_0, s_1, ..., s_n) where each s_i is defined as follows:
-
+        and s is a tuple of n + 1 elements (s_0, s_1, ..., s_n) where each s_i and T is defined as follows:
             s_i := z_i + c * attribute_i
+            T := z_0 + c * t
 
-        and s_0 := z_0 + c * t
-
-        where c = H(commitment, Y_u, alpha)
-
+        where c = H(pk || commitment || Y_u || alpha)§
         ====================================
-
         To verify that a pi proof (alpha, s) is valid, we need to check that:
+            alpha * commitment ** c == g ** T * Y_u_1 ** s_1 * ... * Y_u_n ** s_n
 
-            alpha * commitment ** c == g ** s_0 * Y_u_1 ** s_1 * ... * Y_u_n ** s_n
+        Args:
+            commitment: The commitment to the attributes
+            pk: The public key
+            user_attributes: The attributes of the user
+            t: The class attribute of the user
+        Returns:
+            A tuple (alpha, (s, T)) where alpha is a G1Element, s is a dictionary of attribute indices to Bn elements
+            and T is a Bn element
     """
 
     # Unpack public key
     g, Y = pk[:2]
 
     # Filter public key to only include the attributes in the user attributes
-    Y_u = [Y[i] for i in user_attributes.keys()]
+    Y_u = {i: Y[i] for i in user_attributes.keys()}
 
     # Sample z_i's
-    z = [G1.order().random() for _ in range(len(user_attributes) + 1)]
+    z_0 = G1.order().random()
+    z = {i: G1.order().random() for i in user_attributes.keys()}
 
     # Compute alpha
-    alpha = math.prod(
-        [Y_i ** z_i for Y_i, z_i in zip(Y_u, z[1:])], start=g ** z[0])
+    alpha: G1Element = math.prod([Y[i] ** z[i] for i in user_attributes.keys()], start=g ** z_0)
 
     # Compute challenge
-    challenge = get_challenge(commitment, Y_u, alpha)
+    challenge = get_challenge(pk, commitment, Y_u, alpha)
 
-    # compute s
-    s = [z[0] + challenge * t] + [z_i + challenge *
-                                  Bn.from_binary(attribute) for z_i, attribute in zip(z[1:], user_attributes.values())]
+    # compute T and s
+    T = z_0 + challenge * t
+    s = {i: z[i] + challenge * Bn.from_binary(attribute) for i, attribute in user_attributes.items()}
 
     # Compute and return pi proof
-    return alpha, s, set(user_attributes.keys())
+    return alpha, (s, T)
 
 
-def get_challenge(pk: PublicKey, commitment: G1Element, alpha: G1Element) -> Bn:
+def get_challenge(pk: PublicKey, commitment: G1Element, Y_u: Dict[int, G1Element], alpha: G1Element) -> Bn:
     """ Compute challenge using Fiat-Shamir
 
     We use the hash function sha256 to compute the challenge.
 
-        c = sha256(commitment | public_key)
+        c = sha256(pk || commitment || Y_u || alpha)
     """
+    # Concatenate pk, commitment, Y_u and alpha
+    concatenated = jsonpickle.encode(pk) + jsonpickle.encode(commitment) + \
+                   jsonpickle.encode(Y_u) + jsonpickle.encode(alpha)
 
-    # Compute and return challenge
-    return Bn.from_binary(sha256((jsonpickle.encode(commitment) + jsonpickle.encode(pk) + jsonpickle.encode(alpha)).encode('utf-8')).digest())
+    # Return c as a Bn element
+    return Bn.from_hex(sha256(concatenated.encode('utf-8')).hexdigest())
+
 
 ## SHOWING PROTOCOL ##
 
 
 def create_disclosure_proof(
-    pk: PublicKey,
-    credential: AnonymousCredential,
-    hidden_attributes: List[Attribute],
-    message: bytes
+        pk: PublicKey,
+        credential: AnonymousCredential,
+        hidden_attributes: List[Attribute],
+        message: bytes
 ) -> DisclosureProof:
     """ Create a disclosure proof """
 
@@ -326,33 +325,29 @@ def create_disclosure_proof(
     r, t = G1.order().random(), G1.order().random()
 
     # Compute randomized signature
-    randomized_signature = signature[0] ** r, (signature[1]
-                                               * signature[0] ** t) ** r
+    randomized_signature: Tuple[G1Element, G1Element] = signature[0] ** r, (signature[1] * signature[0] ** t) ** r
 
     # Compute pi proof
-    proof, indexed_hidden_credentials = get_disclosure_proof(
-        pk, hidden_attributes, full_credentials, randomized_signature, t, message)
+    proof, indexed_hidden_credentials = get_disclosure_proof(pk, hidden_attributes, full_credentials,
+                                                             randomized_signature, t, message)
 
     # Get disclosed credentials
-    indexed_disclosed_credentials = {
-        i: full_credentials[i] for i in full_credentials.keys() - indexed_hidden_credentials.keys()}
+    indexed_disclosed_credentials = {i: full_credentials[i] for i in
+                                     full_credentials.keys() - indexed_hidden_credentials.keys()}
 
     # Compute and return disclosure proof
     return randomized_signature, proof, indexed_disclosed_credentials
 
 
 def verify_disclosure_proof(
-    pk: PublicKey,
-    disclosure_proof: DisclosureProof,
-    message: bytes
+        pk: PublicKey,
+        disclosure_proof: DisclosureProof,
+        message: bytes
 ) -> bool:
     """ Verify the disclosure proof
 
     Hint: The verifier may also want to retrieve the disclosed attributes
     """
-
-    # TODO: SAVE DISCLOSED ATTRIBUTES
-    # TODO: INCORPORATE G_TILDE and S2 INTO DISCLOSURE PROOF
 
     # Unpack disclosure proof
     (s1, s2), (commit, alpha, s, T), indexed_disclosed_attributes = disclosure_proof
@@ -365,31 +360,52 @@ def verify_disclosure_proof(
         pk, (s1, s2), commit, message, alpha)
 
     # Get paired terms
-    disclosed_terms = [s1.pair(Y_tilde[i]) ** (-Bn.from_binary(attribute)) for i,
-                       attribute in indexed_disclosed_attributes.items()]
+    disclosed_terms = [s1.pair(Y_tilde[i]) ** (-Bn.from_binary(attribute)) for i, attribute in
+                       indexed_disclosed_attributes.items()]
 
     # Hidden terms
     hidden_terms = [s1.pair(Y_tilde[i]) ** s_i for i, s_i in s.items()]
 
+    # Check that the proof is non-trivial, consistent and correct
+    trivial_check = s1 != G1.neutral_element()
+    correctness_check = commit ** challenge * alpha == math.prod(hidden_terms, start=s1.pair(g_tilde) ** T)
+    consistency_check = math.prod(disclosed_terms, start=s2.pair(g_tilde)) == s1.pair(X_tilde) * commit
+
     # Verify that it is a valid disclosure proof
-    return s1 != G1.neutral_element() and commit ** challenge * alpha == math.prod(hidden_terms, start=s1.pair(g_tilde) ** T) and math.prod(disclosed_terms, start=s2.pair(g_tilde)) == s1.pair(X_tilde) * commit
+    return trivial_check and consistency_check and correctness_check
 
 
-def get_disclosure_proof(pk: PublicKey, hidden_attributes: List[Attribute], full_credentials: AttributeMap, randomized_signature: Signature, t: Bn, message: bytes) -> Tuple[G1Element, Tuple[G1Element, List[Bn], Set[int]]]:
+def get_disclosure_proof(pk: PublicKey, hidden_attributes: List[Attribute], full_credentials: AttributeMap,
+                         randomized_signature: Signature, t: Bn, message: bytes) -> \
+        Tuple[Tuple[G1Element, G1Element, Dict[int, Bn], Bn], Dict[int, Attribute]]:
     """ Compute disclosure proof for showing protocol
 
-    g, (Y_1, ..., Y_n), g_tilde, X_tilde, (Y_tilde_1, ..., Y_tilde_n) = pk
-    s1, s2 = randomized_signature
-    Then the zero knowledge proof is defined as follows:
+    Args:
+        pk: g, (Y_1, ..., Y_n), g_tilde, X_tilde, (Y_tilde_1, ..., Y_tilde_n)
+        hidden_attributes: The attributes hidden to the verifier
+        full_credentials: The full credentials of the user
+        randomized_signature: (s1, s2)
+        t: random signature exponent
+        message: The message to be signed
 
-    PK{(t, (attribute_i)_{i in hidden_attributes}) : s2.pair(g_tilde) * prod(s_1.pair(Y_tilde_i) ** (-a_i)
-        for i in disclosed_attributes)/s1.pair(X_tilde)  == s1.pair(X_tilde) ** t * prod(s_1.pair(Y_tilde_i) ** (a_i) for i in hidden_attributes) }
+    Returns:
+        A tuple ((commit, alpha, s, T), indexed_hidden_attributes) where commit is a G1Element, alpha is a G1Element,
+        s is a dictionary of attribute indices to Bn elements, T is a Bn element and indexed_hidden_attributes is a
+        dictionary of attribute indices to attributes.
+
+        The tuple is a valid disclosure proof for the showing protocol. Namely, it is a valid proof of knowledge:
+
+        PK{ (t, (attribute_i)_{i in hidden_attributes}) :
+            s2.pair(g_tilde) * prod(s_1.pair(Y_tilde_i) ** (-a_i) for i in disclosed_attributes)/s1.pair(X_tilde)
+            is equal to
+            s1.pair(X_tilde) ** t * prod(s_1.pair(Y_tilde_i) ** (a_i) for i in hidden_attributes)
+        }
 
     """
 
     # Index hidden attributes with their index in the full credentials
-    indexed_hidden_attributes = {i: attribute for i, attribute in full_credentials.items(
-    ) if attribute in hidden_attributes}
+    indexed_hidden_attributes: Dict[int, Attribute] = {i: attribute for i, attribute in full_credentials.items() if
+                                                       attribute in hidden_attributes}
 
     # Unpack public key
     g_tilde, X_tilde, Y_tilde = pk[2:]
@@ -398,47 +414,51 @@ def get_disclosure_proof(pk: PublicKey, hidden_attributes: List[Attribute], full
     s1, s2 = randomized_signature
 
     # Compute terms in the pairings
-    Y_pair_terms = {i: s1.pair(Y_tilde[i])
-                    for i in full_credentials.keys()}
+    Y_pair_terms = {i: s1.pair(Y_tilde[i]) for i in full_credentials.keys()}
 
     # Compute hidden terms
-    hidden_terms = [Y_pair_terms[i] ** Bn.from_binary(
-        attribute) for i, attribute in indexed_hidden_attributes.items()]
+    hidden_terms = [Y_pair_terms[i] ** Bn.from_binary(attribute) for i, attribute in indexed_hidden_attributes.items()]
 
     # Sample z_i's
-    z = {i: G1.order().random() for i in indexed_hidden_attributes.keys()}
     z_prime = G1.order().random()
+    z = {i: G1.order().random() for i in indexed_hidden_attributes.keys()}
 
     # Compute commitment
-    commit = math.prod(hidden_terms, start=s1.pair(g_tilde) ** t)
+    commit: G1Element = math.prod(hidden_terms, start=s1.pair(g_tilde) ** t)
 
     # Compute alpha
-    alpha = math.prod([Y_pair_terms[i] ** z[i]
-                      for i in indexed_hidden_attributes.keys()], start=s1.pair(g_tilde) ** z_prime)
+    alpha: G1Element = math.prod([Y_pair_terms[i] ** z[i] for i in indexed_hidden_attributes.keys()],
+                                 start=s1.pair(g_tilde) ** z_prime)
 
     # Compute challenge
-    challenge = get_disclosure_challenge(
-        pk, randomized_signature, commit, message, alpha)
-
-    # compute s
-    s = {i: z[i] + challenge * Bn.from_binary(attribute)
-         for i, attribute in indexed_hidden_attributes.items()}
+    challenge = get_disclosure_challenge(pk, randomized_signature, commit, message, alpha)
 
     # Compute term for t
-    T = z_prime + challenge * t
+    T: Bn = z_prime + challenge * t
+
+    # compute s_i's
+    s = {i: z[i] + challenge * Bn.from_binary(attribute) for i, attribute in indexed_hidden_attributes.items()}
+
     # Compute and return pi proof
     return (commit, alpha, s, T), indexed_hidden_attributes
 
 
 def get_disclosure_challenge(
-    pk: PublicKey,
-    randomized_signature: Signature,
-    commitment: G1Element,
-    message: bytes,
-    alpha: G1Element
+        pk: PublicKey,
+        randomized_signature: Signature,
+        commitment: G1Element,
+        message: bytes,
+        alpha: G1Element
 ) -> Bn:
-    """ Compute challenge for showing protocol """
+    """ Compute challenge for the showing protocol
+
+        Returns:
+            A challenge c := H(pk || randomized_signature || commitment || message || alpha)
+    """
+
+    # Concatenate elements
+    concatenated = jsonpickle.encode(pk) + jsonpickle.encode(randomized_signature) + \
+                   jsonpickle.encode(commitment) + message.hex() + jsonpickle.encode(alpha)
 
     # Compute and return challenge
-    return Bn.from_binary(sha256((jsonpickle.encode(pk) + jsonpickle.encode(randomized_signature) +
-                                  jsonpickle.encode(commitment) + message.hex() + jsonpickle.encode(alpha)).encode('utf-8')).digest())
+    return Bn.from_hex(sha256(concatenated.encode("utf-8")).hexdigest())
