@@ -30,4 +30,3 @@ def get_nearby_pois(loc: np.ndarray, poi_type: str):
                 poi_ids.append(POI_IDS[i])
 
     return poi_ids
-
