@@ -6,7 +6,7 @@ import jsonpickle
 import pytest
 from petrelic.multiplicative.pairing import G1
 
-import client
+import client as client
 import random
 
 from credential import AnonymousCredential

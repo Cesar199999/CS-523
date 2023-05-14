@@ -1,0 +1,10 @@
+--------------------------- benchmark: 6 tests ---------------------------
+Name (time in ms)                         Mean            StdDev
+--------------------------------------------------------------------------
+test_verification_benchmarks[1]         8.1899 (1.0)      0.8761 (1.0)
+test_verification_benchmarks[5]        14.0597 (1.72)     1.4212 (1.62)
+test_verification_benchmarks[10]       20.7969 (2.54)     1.1319 (1.29)
+test_verification_benchmarks[20]       33.0652 (4.04)     2.0333 (2.32)
+test_verification_benchmarks[50]       72.4060 (8.84)     4.2325 (4.83)
+test_verification_benchmarks[100]     138.9123 (16.96)    9.2750 (10.59)
+--------------------------------------------------------------------------

@@ -1,4 +1,3 @@
-import jsonpickle
 from stroll import Client, Server
 
 

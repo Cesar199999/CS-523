@@ -1,0 +1,10 @@
+---------------------------- benchmark: 6 tests ---------------------------
+Name (time in ms)                          Mean            StdDev
+---------------------------------------------------------------------------
+test_key_generation_benchmarks[1]        1.5116 (1.0)      0.1347 (1.0)
+test_key_generation_benchmarks[5]        2.9063 (1.92)     0.3624 (2.69)
+test_key_generation_benchmarks[10]       4.4721 (2.96)     0.3559 (2.64)
+test_key_generation_benchmarks[20]       7.8180 (5.17)     0.5326 (3.95)
+test_key_generation_benchmarks[50]      17.5789 (11.63)    0.5412 (4.02)
+test_key_generation_benchmarks[100]     35.4558 (23.46)    2.4305 (18.04)
+---------------------------------------------------------------------------
