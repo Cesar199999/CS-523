@@ -29,8 +29,8 @@ def read_communication_costs_from_file(filename: str) -> Dict[int, float]:
         # Strip lines
         lines = [line.replace(":", "").replace(",", "").split(" ") for line in f.readlines()]
 
-        # Strip and convert to actual values
-        result = {int(num_attributes): (float(mean), float(std)) for num_attributes, mean, std in lines}
+        # Strip and convert to actual values and transform to KB
+        result = {int(num_attributes): (float(mean) / 1000, float(std) / 1000) for num_attributes, mean, std in lines}
 
     return result
 
@@ -74,12 +74,12 @@ def generate_plot(path: str, show: bool = False):
     plt.grid(which='major', color='#666666', linestyle='-', alpha=0.1)
 
     # Add legend and labels
-    plt.ylabel("Communication cost [bytes]" if "communication" in path else "Computation cost [s]")
+    plt.ylabel("Communication cost [KB]" if "communication" in path else "Computation cost [ms]")
     plt.xlabel("Number of attributes")
     plt.legend()
 
     # Save the plot
-    plt.savefig(path + path.replace("/", ".png"), dpi=300)
+    plt.savefig(path + path.replace("/", ".png"), dpi=300, bbox_inches='tight')
 
     # Show the plot
     if show:
