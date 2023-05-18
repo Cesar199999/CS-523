@@ -1,0 +1,6 @@
+privacy_evaluation/__pycache__/
+privacy_evaluation/figures/coord_visited/*.png
+privacy_evaluation/figures/meetings/*.png
+privacy_evaluation/figures/type_searched/*.png
+privacy_evaluation/.ipynb_checkpoints/
+tor/
