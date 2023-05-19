@@ -4,3 +4,9 @@ privacy_evaluation/figures/meetings/*.png
 privacy_evaluation/figures/type_searched/*.png
 privacy_evaluation/.ipynb_checkpoints/
 tor/
+data_collection/
+__pycache__/
+anon.cred
+key-client.pub
+key.pub
+key.sec
