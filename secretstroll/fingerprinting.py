@@ -1,9 +1,19 @@
 import numpy as np
+import os
+import re
+import dpkt
+import sys
+import socket
 
-from sklearn.model_selection import train_test_split
+from pandas import DataFrame
+from typing import TypedDict, List
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import StratifiedKFold
 
+class Trace(TypedDict):
+    filename: str
+    trace_grid_id: int
+    trace_len: int
 
 def classify(train_features, train_labels, test_features, test_labels):
 
@@ -94,12 +104,63 @@ def load_data():
     ###############################################
     # TODO: Complete this function. 
     ###############################################
-    
+    # preprocess packet
+    traces_name = os.listdir("/data_collection")
+    traces = pre_process_pcap_file(traces_name)
+
+    # know we want to remove outliers using interquartile methods
+    dataframe = DataFrame(data=traces)
+    filtered_traces = remove_outliers(dataframe)
+
+    # TODO: process filtered data
+
     features = []
     labels = []
 
-    return features, labels
-        
+    return features, labels    
+
+def pre_process_pcap_file(directory) -> List[Trace]:
+    for filename in directory:
+        packet_count = 0
+
+        with open("data_collection/"+filename, 'rb') as pcap_file:
+            pcap = dpkt.pcap.Reader(pcap_file)
+            for pckt in pcap:  
+                packet_count+=1
+
+    return {'filename': filename, 'trace_grid_id' : [int(s) for s in re.findall(r'\b\d+\b', filename)][0], 'trace_len': packet_count}
+
+def remove_outliers(dataframe, tresholds = 1.5):
+    q1 = dataframe['trace_len'].quantile(0.25)
+    q3 = dataframe['trace_len'].quantile(0.75)
+
+    iqr = q3-q1
+
+    lower_limit = q1 - (tresholds*iqr)
+    upper_limit = q2 + (tresholds*iqr)
+
+    filtered_dataframe = dataframe[(dataframe['trace_len'] >= lower_limit) & (dataframe['trace_len']<=upper_limit)]
+
+    return filtered_dataframe
+
+##TODO: not finished
+def parse_pcap(filename):
+
+    with open(filename, 'rb') as pcap_file:
+        pcap = dpkt.pcap.Reader(pcap_file)
+
+        for timestamp, buf in pcap:
+            try:
+                eth_hdr = dpkt.ethernet.Ethernet(buf)
+                ip_hdr = eth_hdr.data
+                src_ip = socket.inet_ntoa(ip.src)
+                dst_ip = socket.inet_ntoa(ip.dest)
+                if isinstance(ip_hdr.data, dpkt.tcp.TCP):
+                    tcp_hdr = ip_hdr.data
+
+            except (dpkt.dpkt.NeedData, dpkt.dpkt.UnpackError) as e:
+                print("error during packet extraction")
+    
 def main():
 
     """Please complete this skeleton to implement cell fingerprinting.
