@@ -50,8 +50,8 @@ def add_to_plot(path: str, filename: str, color: str):
     label = (filename.split(".")[0] if filename != "key_generation.txt" else "key generation").capitalize()
 
     # Plot the communication cost
-    plt.plot(mean.keys(), mean.values(), label=label, color=color, linestyle='dashed', marker='x', markersize=7)
-    plt.errorbar(mean.keys(), mean.values(), yerr=list(std.values()), color=color, linestyle='dashed')
+    plt.errorbar(mean.keys(), mean.values(), yerr=list(std.values()), color=color, linestyle='dashed', linewidth=0.6,
+                 marker='x', markersize=3, capsize=3, label=label)
 
 
 def generate_plot(path: str, show: bool = False):
@@ -76,7 +76,7 @@ def generate_plot(path: str, show: bool = False):
     # Add legend and labels
     plt.ylabel("Communication cost [KB]" if "communication" in path else "Computation cost [ms]")
     plt.xlabel("Number of attributes")
-    plt.legend()
+    plt.legend(frameon=False, numpoints=1)
 
     # Save the plot
     plt.savefig(path + path.replace("/", ".png"), dpi=300, bbox_inches='tight')

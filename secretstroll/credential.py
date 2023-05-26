@@ -72,6 +72,9 @@ def sign(
     # Unpack secret key
     x, _, y = sk
 
+    # Check that the number of messages is equal to the number private attributes
+    assert len(msgs) == len(y)
+
     # Pick generator h
     h = G1.generator()
 
@@ -92,12 +95,11 @@ def verify(
     # Unpack signature
     generator, witness = signature
 
-    # Get Y vector
-    terms = [Y_i ** Bn.from_binary(msg) for Y_i, msg in zip(Y_tilde, msgs)]
+    # Get product
+    product = point_product(Y_tilde, bn_from_binary_collection(msgs), X_tilde)
 
     # Verify signature
-    return False if generator == G1.neutral_element() else \
-        generator.pair(math.prod(terms, start=X_tilde)) == witness.pair(g_tilde)
+    return trivial_check(generator) and generator.pair(product) == witness.pair(g_tilde)
 
 
 #################################
@@ -135,21 +137,17 @@ def create_issue_request(
     # Unpack public key
     g, Y = pk[:2]
 
-    Y_u = [Y[i] for i in user_attributes.keys()]
+    Y_u = {i: Y[i] for i in user_attributes.keys()}
 
     # Sample random t and fix it to the class attribute, as well as the user attributes
     user_state.t = G1.order().random()
     user_state.user_attributes = user_attributes
 
-    # Product terms
-    terms = [Y_i ** Bn.from_binary(attribute)
-             for Y_i, attribute in zip(Y_u, user_attributes.values())]
-
     # Compute commitment
-    commitment: G1Element = math.prod(terms, start=g ** user_state.t)
+    commitment = point_product(Y_u, bn_from_binary_collection(user_attributes), g ** user_state.t)
 
     # Compute witness, non-interactive proof pi applying Fiat-Shamir
-    pi_proof: Tuple[G1Element, Tuple[Dict[int, Bn], Bn]] = get_pi_proof(commitment, pk, user_attributes, user_state.t)
+    pi_proof = get_pi_proof(commitment, pk, user_attributes, user_state.t)
 
     # Compute and return request
     return commitment, pi_proof
@@ -177,14 +175,13 @@ def sign_issue_request(
     X, (g, Y) = sk[1], pk[:2]
 
     # Get subset of public keys corresponding to the issuer attributes
-    Y_I = [Y[i] for i in issuer_attributes.keys()]
+    Y_I = {i: Y[i] for i in issuer_attributes.keys()}
 
     # Get Y_i product terms
-    terms = [Y_i ** Bn.from_binary(attribute)
-             for Y_i, attribute in zip(Y_I, issuer_attributes.values())]
+    product_terms = point_product(Y_I, bn_from_binary_collection(issuer_attributes), X * commitment)
 
     # Compute and return signature and issuer attributes
-    return (g ** u, math.prod(terms, start=X * commitment) ** u), issuer_attributes
+    return (g ** u, product_terms ** u), issuer_attributes
 
 
 def obtain_credential(
@@ -229,14 +226,11 @@ def verify_issue_request(request: IssueRequest, pk: PublicKey) -> bool:
     # Get pks for user attributes
     Y_u = {i: pk[1][i] for i in s.keys()}
 
-    # Compute c
-    c = get_challenge(pk, commitment, Y_u, alpha)
-
-    # Product terms
-    terms = [Y_u[i] ** s[i] for i in s.keys()]
+    # Compute challenge
+    challenge = get_challenge(pk, commitment, alpha)
 
     # Verify that it is a valid pi proof
-    return alpha * commitment ** c == math.prod(terms, start=g ** T)
+    return alpha * commitment ** challenge == point_product(Y_u, s, g ** T)
 
 
 def get_pi_proof(commitment: G1Element, pk: PublicKey, user_attributes: AttributeMap, t: Bn) -> \
@@ -253,8 +247,8 @@ def get_pi_proof(commitment: G1Element, pk: PublicKey, user_attributes: Attribut
             s_i := z_i + c * attribute_i
             T := z_0 + c * t
 
-        where c = H(pk || commitment || Y_u || alpha)§
-        ====================================
+        where c = H(pk || commitment || alpha)
+
         To verify that a pi proof (alpha, s) is valid, we need to check that:
             alpha * commitment ** c == g ** T * Y_u_1 ** s_1 * ... * Y_u_n ** s_n
 
@@ -279,10 +273,10 @@ def get_pi_proof(commitment: G1Element, pk: PublicKey, user_attributes: Attribut
     z = {i: G1.order().random() for i in user_attributes.keys()}
 
     # Compute alpha
-    alpha: G1Element = math.prod([Y[i] ** z[i] for i in user_attributes.keys()], start=g ** z_0)
+    alpha = point_product(Y_u, z, g ** z_0)
 
     # Compute challenge
-    challenge = get_challenge(pk, commitment, Y_u, alpha)
+    challenge = get_challenge(pk, commitment, alpha)
 
     # compute T and s
     T = z_0 + challenge * t
@@ -290,21 +284,6 @@ def get_pi_proof(commitment: G1Element, pk: PublicKey, user_attributes: Attribut
 
     # Compute and return pi proof
     return alpha, (s, T)
-
-
-def get_challenge(pk: PublicKey, commitment: G1Element, Y_u: Dict[int, G1Element], alpha: G1Element) -> Bn:
-    """ Compute challenge using Fiat-Shamir
-
-    We use the hash function sha256 to compute the challenge.
-
-        c = sha256(pk || commitment || Y_u || alpha)
-    """
-    # Concatenate pk, commitment, Y_u and alpha
-    concatenated = jsonpickle.encode(pk) + jsonpickle.encode(commitment) + \
-                   jsonpickle.encode(Y_u) + jsonpickle.encode(alpha)
-
-    # Return c as a Bn element
-    return Bn.from_hex(sha256(concatenated.encode('utf-8')).hexdigest())
 
 
 ## SHOWING PROTOCOL ##
@@ -356,23 +335,23 @@ def verify_disclosure_proof(
     g_tilde, X_tilde, Y_tilde = pk[2:]
 
     # Get challenge
-    challenge = get_disclosure_challenge(
-        pk, (s1, s2), commit, message, alpha)
+    challenge = get_disclosure_challenge(pk, (s1, s2), commit, message, alpha)
 
-    # Get paired terms
-    disclosed_terms = [s1.pair(Y_tilde[i]) ** (-Bn.from_binary(attribute)) for i, attribute in
-                       indexed_disclosed_attributes.items()]
+    # Pair keys
+    disclosed_paired_terms = {i: s1.pair(y) for i, y in enumerate(Y_tilde) if i in indexed_disclosed_attributes.keys()}
+    hidden_paired_terms = {i: s1.pair(y) for i, y in enumerate(Y_tilde) if i in s.keys()}
+
+    # Disclosed terms
+    exponents = {i: -b for i, b in bn_from_binary_collection(indexed_disclosed_attributes).items()}
+    disclosed_terms_product = point_product(disclosed_paired_terms, exponents, s2.pair(g_tilde))
 
     # Hidden terms
-    hidden_terms = [s1.pair(Y_tilde[i]) ** s_i for i, s_i in s.items()]
-
-    # Check that the proof is non-trivial, consistent and correct
-    trivial_check = s1 != G1.neutral_element()
-    correctness_check = commit ** challenge * alpha == math.prod(hidden_terms, start=s1.pair(g_tilde) ** T)
-    consistency_check = math.prod(disclosed_terms, start=s2.pair(g_tilde)) == s1.pair(X_tilde) * commit
+    hidden_terms_product = point_product(hidden_paired_terms, s, s1.pair(g_tilde) ** T)
 
     # Verify that it is a valid disclosure proof
-    return trivial_check and consistency_check and correctness_check
+    return trivial_check(s1) and \
+        commit ** challenge * alpha == hidden_terms_product and \
+        s1.pair(X_tilde) * commit == disclosed_terms_product
 
 
 def get_disclosure_proof(pk: PublicKey, hidden_attributes: List[Attribute], full_credentials: AttributeMap,
@@ -414,21 +393,17 @@ def get_disclosure_proof(pk: PublicKey, hidden_attributes: List[Attribute], full
     s1, s2 = randomized_signature
 
     # Compute terms in the pairings
-    Y_pair_terms = {i: s1.pair(Y_tilde[i]) for i in full_credentials.keys()}
-
-    # Compute hidden terms
-    hidden_terms = [Y_pair_terms[i] ** Bn.from_binary(attribute) for i, attribute in indexed_hidden_attributes.items()]
+    Y_pair_terms = {i: s1.pair(Y_tilde[i]) for i in indexed_hidden_attributes.keys()}
 
     # Sample z_i's
     z_prime = G1.order().random()
     z = {i: G1.order().random() for i in indexed_hidden_attributes.keys()}
 
     # Compute commitment
-    commit: G1Element = math.prod(hidden_terms, start=s1.pair(g_tilde) ** t)
+    commit = point_product(Y_pair_terms, bn_from_binary_collection(indexed_hidden_attributes), s1.pair(g_tilde) ** t)
 
     # Compute alpha
-    alpha: G1Element = math.prod([Y_pair_terms[i] ** z[i] for i in indexed_hidden_attributes.keys()],
-                                 start=s1.pair(g_tilde) ** z_prime)
+    alpha = point_product(Y_pair_terms, z, s1.pair(g_tilde) ** z_prime)
 
     # Compute challenge
     challenge = get_disclosure_challenge(pk, randomized_signature, commit, message, alpha)
@@ -441,6 +416,60 @@ def get_disclosure_proof(pk: PublicKey, hidden_attributes: List[Attribute], full
 
     # Compute and return pi proof
     return (commit, alpha, s, T), indexed_hidden_attributes
+
+
+############################################ HELPER FUNCTIONS #########################################################
+
+def point_product(points: Union[Dict[int, G1Element], List[G1Element]],
+                  exponents: Union[Dict[int, Bn], List[Bn]] = None, shift: Bn = None) -> G1Element:
+    """ Compute the product of points raised to exponents multiplied by shift """
+
+    # If no exponents are given, set them to 1
+    if exponents is None:
+        if isinstance(points, Dict):
+            exponents = {i: Bn(1) for i in points.keys()}
+        else:
+            exponents = [Bn(1) for _ in points]
+
+    # If no shift is given, set it to 1
+    if shift is None:
+        shift = G1.neutral_element()
+
+    # Check that the number of points and exponents are the same
+    assert len(points) == len(exponents)
+
+    # Get terms
+    terms = [points[key] ** exponents[key] for key in points.keys()] if isinstance(points, Dict) \
+        else [point ** exponent for point, exponent in zip(points, exponents)]
+
+    # Return product
+    return math.prod(terms, start=shift)
+
+
+def bn_from_binary_collection(binary_collection: Union[Dict[int, str], List[str]]) -> Union[Dict[int, Bn], List[Bn]]:
+    """ Convert a collection of binary strings to a collection of Bn elements """
+
+    return {key: Bn.from_binary(binary) for key, binary in binary_collection.items()} if isinstance(binary_collection,
+                                                                                                    Dict) \
+        else [Bn.from_binary(binary) for binary in binary_collection]
+
+
+def trivial_check(point: G1Element) -> bool:
+    """ Check that the point is not the neutral element """
+
+    return point != G1.neutral_element()
+
+
+def get_challenge(pk: PublicKey, commitment: G1Element, alpha: G1Element) -> Bn:
+    """ Compute challenge using Fiat-Shamir
+
+    We use the hash function sha256 to compute the challenge.
+
+        c = sha256(pk || commitment || Y_u || alpha)
+    """
+
+    # Pickle and hash the concatenated elements
+    return pickle_and_hash((pk, commitment, alpha))
 
 
 def get_disclosure_challenge(
@@ -456,9 +485,22 @@ def get_disclosure_challenge(
             A challenge c := H(pk || randomized_signature || commitment || message || alpha)
     """
 
-    # Concatenate elements
-    concatenated = jsonpickle.encode(pk) + jsonpickle.encode(randomized_signature) + \
-                   jsonpickle.encode(commitment) + message.hex() + jsonpickle.encode(alpha)
+    # Pickle and hash the concatenated elements
+    return pickle_and_hash((pk, randomized_signature, commitment, message, alpha))
 
-    # Compute and return challenge
-    return Bn.from_hex(sha256(concatenated.encode("utf-8")).hexdigest())
+
+def pickle_and_hash(obj: Any) -> Bn:
+    """ Pickle and hash an object
+
+    Args:
+        obj: The object to be pickled and hashed
+
+    Returns:
+        The hash of the pickled object
+    """
+
+    # Pickle object
+    pickled = jsonpickle.encode(obj)
+
+    # Return hash of pickled object
+    return Bn.from_hex(sha256(pickled.encode("utf-8")).hexdigest())

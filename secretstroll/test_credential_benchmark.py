@@ -10,6 +10,8 @@ num_attributes_parameter = [1, 5, 10, 20, 50, 100]
 # pytest test_credential_benchmark.py -k test_issuance_benchmarks --benchmark-columns=mean,stddev
 # pytest test_credential_benchmark.py -k test_showing_benchmarks --benchmark-columns=mean,stddev
 # pytest test_credential_benchmark.py -k test_verification_benchmarks --benchmark-columns=mean,stddev
+# OR
+# sh benchmark.sh
 ##############################################################################
 
 @pytest.mark.parametrize("num_attributes", num_attributes_parameter)
@@ -25,7 +27,7 @@ def test_key_generation_benchmarks(num_attributes: int, benchmark):
 
 @pytest.mark.parametrize("num_attributes", num_attributes_parameter)
 def test_issuance_benchmarks(num_attributes: int, benchmark):
-    """ Test the communication and time complexity of the key generation protocol """
+    """ Test the communication and time complexity of the issuance protocol """
 
     # Generate a key pair and subscriptions
     args = key_generation(num_attributes)
@@ -36,7 +38,7 @@ def test_issuance_benchmarks(num_attributes: int, benchmark):
 
 @pytest.mark.parametrize("num_attributes", num_attributes_parameter)
 def test_showing_benchmarks(num_attributes: int, benchmark):
-    """ Test the communication and time complexity of the key generation protocol """
+    """ Test the communication and time complexity of the showing protocol """
 
     # Generate a key pair and subscriptions
     args = key_generation(num_attributes)
@@ -50,7 +52,7 @@ def test_showing_benchmarks(num_attributes: int, benchmark):
 
 @pytest.mark.parametrize("num_attributes", num_attributes_parameter)
 def test_verification_benchmarks(num_attributes: int, benchmark):
-    """ Test the communication and time complexity of the key generation protocol """
+    """ Test the communication and time complexity of the verification protocol """
 
     # Generate a key pair and subscriptions
     args = key_generation(num_attributes)
@@ -100,6 +102,8 @@ def issuance_protocol(server, client, sk, pk, subscriptions, user_subscriptions,
 
 
 def showing_protocol(server, client, sk, pk, subscriptions, user_subscriptions, credentials, num_attributes: int):
+    """ Helper function to benchmark the showing protocol """
+
     # Sign a request
     signed_request = client.sign_request(pk, credentials, b"message", user_subscriptions)
 
@@ -111,6 +115,8 @@ def showing_protocol(server, client, sk, pk, subscriptions, user_subscriptions, 
 
 def verification_protocol(server, client, sk, pk, subscriptions, user_subscriptions, credentials, signed_request,
                           num_attributes: int):
+    """ Helper function to benchmark the verification protocol """
+
     # Verify the signature
     assert server.check_request_signature(pk, b"message", user_subscriptions, signed_request)
 
@@ -121,9 +127,12 @@ def write_communication_cost():
     yield None
 
     # Write the communication cost to a file
-    write_communication_benchmark_queue(key_bytes, "benchmarks/communication_cost_benchmarks/key_generation.txt")
-    write_communication_benchmark_queue(issuance_bytes, "benchmarks/communication_cost_benchmarks/issuance.txt")
-    write_communication_benchmark_queue(showing_bytes, "benchmarks/communication_cost_benchmarks/showing.txt")
+    if key_bytes != {}:
+        write_communication_benchmark_queue(key_bytes, "benchmarks/communication_cost_benchmarks/key_generation.txt")
+    if issuance_bytes != {}:
+        write_communication_benchmark_queue(issuance_bytes, "benchmarks/communication_cost_benchmarks/issuance.txt")
+    if showing_bytes != {}:
+        write_communication_benchmark_queue(showing_bytes, "benchmarks/communication_cost_benchmarks/showing.txt")
 
 
 def generate_subscriptions(num_subscriptions: int) -> Tuple[List[str], List[str]]:

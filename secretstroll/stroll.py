@@ -251,8 +251,7 @@ class Client:
         pk, subscriptionMap = tmp
 
         # Deserialize the credential
-        credential: AnonymousCredential = jsonpickle.decode(
-            credentials.decode('utf-8'), keys=True)
+        credential: AnonymousCredential = jsonpickle.decode(credentials.decode('utf-8'), keys=True)
 
         # Unpack the credential
         full_attributes = credential[1]

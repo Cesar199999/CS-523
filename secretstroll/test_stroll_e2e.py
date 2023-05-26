@@ -11,6 +11,9 @@ import random
 
 from credential import AnonymousCredential
 
+# Tests the system end-to-end, from the client's perspective
+
+
 ################### SERVER MUST BE RUNNING FOR THESE TESTS TO PASS ####################
 
 # SERVER_COMMANDS:
@@ -30,7 +33,7 @@ from credential import AnonymousCredential
 subscription_list = ["restaurant", "bar", "hotel", "park", "museum", "theatre", "cinema", "gym", "pool", "spa"]
 
 # To test shuffling of subscriptions:
-# TODO: Server returns any POI, this is the skeleton's fault: https://moodle.epfl.ch/mod/forum/discuss.php?d=89847
+# TODO: Server returns any POI, skeleton's fault: https://moodle.epfl.ch/mod/forum/discuss.php?d=89847
 client_subscriptions = random.sample(subscription_list, random.randint(1, len(subscription_list)))
 
 
