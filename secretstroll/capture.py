@@ -1,9 +1,10 @@
 import subprocess
+from datetime import datetime
 
 # we iterate over all cells in the grid.
 for i in range(1, 101):
     # set the name of the trace to be registered
-    trace_name = "data_collection/trace_grid_{i}.pcap".format(i = str(i))
+    trace_name = "data_collection/trace_grid_{i}_{date}.pcap".format(i = str(i), date = datetime.now().strftime("%d_%H:%M:%S"))
     print("capturing "+ trace_name)
 
     # use tcpdump to intercept tcp packets and use -w options to read it

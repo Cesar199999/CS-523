@@ -1,9 +1,20 @@
 import numpy as np
+import os
+import dpkt
+import pandas as pd
+import re
+import sys
+import socket
 
-from sklearn.model_selection import train_test_split
+from typing import TypedDict, List
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
 
+class Trace(TypedDict):
+    filename: str
+    trace_grid_id: int
+    trace_len: int
 
 def classify(train_features, train_labels, test_features, test_labels):
 
@@ -30,8 +41,73 @@ def classify(train_features, train_labels, test_features, test_labels):
     clf.fit(train_features, train_labels)
     # Use the classifier to make predictions on the test features.
     predictions = clf.predict(test_features)
+
+    predicted_probs = clf.predict_proba(test_features)
     
-    return predictions
+    return predictions, predicted_probs
+
+def perf_evaluation(true_labels, predicted_labels, predicted_probs):
+    
+    perf_metrics = {}
+    print(true_labels)
+    print(predicted_labels)
+    accuracy = accuracy_score(true_labels, predicted_labels)
+    precision = precision_score(true_labels, predicted_labels, average='weighted')
+    recall = recall_score(true_labels, predicted_labels, average='weighted')
+    f1 = f1_score(true_labels, predicted_labels, average='weighted')
+    auc_roc = roc_auc_score(true_labels, predicted_probs, multi_class='ovr')
+
+    confusion = confusion_matrix(true_labels, predicted_labels)
+    #tn, fp, fn, tp = confusion.ravel()
+
+    perf_metrics['accuracy'] = accuracy
+    perf_metrics['precision'] = precision
+    perf_metrics['recall'] = recall
+    perf_metrics['f1-score'] = f1
+    #perf_metrics['true_positive'] = tp
+    #perf_metrics['true_negative'] = tn
+    #perf_metrics['false_positive'] = fp
+    #perf_metrics['false_negative'] = fn
+    #perf_metrics['auc_roc'] = auc_roc
+
+    return perf_metrics
+
+def aggregate_performance(performance_metrics_list):
+    """
+    Function to aggregate performance metrics across all folds.
+    Args:
+        performance_metrics_list (list): list of performance metrics dictionaries for each fold
+    Returns:
+        aggregated_metrics (dict): dictionary of aggregated performance metrics
+    """
+    aggregated_metrics = {}
+
+    accuracies = []
+    precisions = []
+    recalls = []
+    f1_scores = []
+    auc_rocs = []
+
+    for metrics in performance_metrics_list:
+        accuracies.append(metrics['accuracy'])
+        precisions.append(metrics['precision'])
+        recalls.append(metrics['recall'])
+        f1_scores.append(metrics['f1-score'])
+        #auc_rocs.append(metrics['auc_roc'])
+
+    aggregated_metrics['accuracy_mean'] = np.mean(accuracies)
+    aggregated_metrics['precision_mean'] = np.mean(precisions)
+    aggregated_metrics['recall_mean'] = np.mean(recalls)
+    aggregated_metrics['f1_score_mean'] = np.mean(f1_scores)
+    #aggregated_metrics['auc_roc_mean'] = np.mean(auc_rocs)
+
+    aggregated_metrics['accuracy_std'] = np.std(accuracies)
+    aggregated_metrics['precision_std'] = np.std(precisions)
+    aggregated_metrics['recall_std'] = np.std(recalls)
+    aggregated_metrics['f1_score_std'] = np.std(f1_scores)
+    #aggregated_metrics['auc_roc_std'] = np.std(auc_rocs)
+
+    return aggregated_metrics
 
 def perform_crossval(features, labels, folds=10):
 
@@ -53,15 +129,21 @@ def perform_crossval(features, labels, folds=10):
     kf = StratifiedKFold(n_splits=folds)
     labels = np.array(labels)
     features = np.array(features)
-
+    fold_perf = []
     for train_index, test_index in kf.split(features, labels):
         X_train, X_test = features[train_index], features[test_index]
         y_train, y_test = labels[train_index], labels[test_index]
-        predictions = classify(X_train, y_train, X_test, y_test)
+        predictions, predicted_probs = classify(X_train, y_train, X_test, y_test)
 
-    ###############################################
-    # TODO: Write code to evaluate the performance of your classifier
-    ###############################################
+        fold_perf.append(perf_evaluation(y_test, predictions, predicted_probs))
+    
+    global_perf = aggregate_performance(fold_perf)
+
+    print("accuracy: "+str(global_perf['accuracy_mean']))
+    print("precision: "+str(global_perf['precision_mean']))
+    print("recall: "+str(global_perf['recall_mean']))
+    print("f1_score: "+str(global_perf['f1_score_mean']))
+    #print("au_roc: "+str(global_perf['auc_roc_mean']))
 
 def load_data():
 
@@ -91,15 +173,125 @@ def load_data():
     feature extraction on your own.
     """
 
-    ###############################################
-    # TODO: Complete this function. 
-    ###############################################
-    
+    # preprocess traces
+    traces_name = os.listdir("data_collection/")
+    traces = pre_process_pcap_file(traces_name)
+
+    # now we want to remove outliers using interquartile methods
+    dataframe = pd.DataFrame(data=traces)
+    dataframe = dataframe.set_index('trace_grid_id')
+    dataframe = dataframe.sort_index()
+
+    filtered_traces = remove_outliers(dataframe)
+    traces_name_filtered = [filename for filename in traces_name if filename in filtered_traces.filename.values.tolist()]
+
     features = []
     labels = []
 
-    return features, labels
+    features = extract_features(traces_name_filtered)
+    labels = extract_labels(traces_name_filtered)
+
+    return features, labels    
+
+def extract_labels(traces):
+    labels = []
+    for trace in traces:
+        labels.append([int(s) for s in re.split('[_.]', trace) if s.isdigit()][0])
+    return labels
+
+def pre_process_pcap_file(directory) -> List[Trace]:
+    traces = []
+    for filename in directory:
+        packet_count = 0
+        packet_count = count_packet(filename)
+        traces.append({'filename': filename, 'trace_grid_id' : [int(s) for s in re.split('[_.]', filename) if s.isdigit()][0], 'trace_len': packet_count})
+
+    return traces
+
+def remove_outliers(dataframe, tresholds = 1.5):
+    q1 = dataframe['trace_len'].quantile(0.25)
+    q3 = dataframe['trace_len'].quantile(0.75)
+
+    iqr = q3-q1
+
+    lower_limit = q1 - (tresholds*iqr)
+    upper_limit = q3 + (tresholds*iqr)
+
+    filtered_dataframe = dataframe[(dataframe['trace_len'] >= lower_limit) & (dataframe['trace_len']<=upper_limit) & (dataframe['trace_len'] != 0)]
+
+    return filtered_dataframe
+
+def count_packet(trace) -> int:
+    with open("data_collection/"+trace,'rb') as pcap_file:
+        pcap = dpkt.pcap.Reader(pcap_file)
+        packet_count = 0
+        for pkt in pcap:
+            packet_count+=1
+    return packet_count
+
+def measure_time_exchange(trace) -> float:
+    with open("data_collection/"+trace,'rb') as pcap_file:
+        pcap = dpkt.pcap.Reader(pcap_file)
         
+        start_time = float('inf')
+        end_time = float('-inf')
+        for timestamp, buff in pcap:
+            if start_time == float('inf'):
+                start_time = timestamp
+            else:
+                end_time = timestamp
+
+    return end_time-start_time
+
+def count_rounds(trace):
+    with open("data_collection/"+trace,'rb') as pcap_file:
+        pcap = dpkt.pcap.Reader(pcap_file)
+        rounds = 0
+        last_seq = None
+
+        for timestamp, buf in pcap:
+            eth = dpkt.ethernet.Ethernet(buf)
+            ip = eth.data
+            tcp = ip.data
+        
+            if last_seq is None:
+                last_seq = tcp.seq
+            elif tcp.seq > last_seq:
+                rounds += 1
+            last_seq = tcp.seq
+    
+    return rounds
+
+def compute_total_size(trace):
+    with open("data_collection/"+trace,'rb') as pcap_file:
+
+        pcap = dpkt.pcap.Reader(pcap_file)
+        total_size = 0
+
+        for timestamp, buf in pcap:
+            eth = dpkt.ethernet.Ethernet(buf)
+            ip = eth.data
+            total_size += ip.len
+    
+    return total_size
+
+def extract_features(filenames) -> List[List]:
+    features = []
+    for trace in filenames:
+        # extract number of packet in the trace
+        nb_packet = count_packet(trace)
+        # extract exchange duration
+        exchange_duration = measure_time_exchange(trace)
+
+        # count the number of round
+        nb_rounds = count_rounds(trace)
+
+        # communication size in Byte
+        size = compute_total_size(trace)
+
+        features.append([nb_packet, exchange_duration, nb_rounds, size])
+    return features
+    
 def main():
 
     """Please complete this skeleton to implement cell fingerprinting.
