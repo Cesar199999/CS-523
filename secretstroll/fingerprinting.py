@@ -4,8 +4,8 @@ import dpkt
 import pandas as pd
 import re
 import sys
-import socket
 
+from ipaddress import ip_address
 from typing import TypedDict, List
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
@@ -36,7 +36,7 @@ def classify(train_features, train_labels, test_features, test_labels):
     """
 
     # Initialize a random forest classifier. Change parameters if desired.
-    clf = RandomForestClassifier()
+    clf = RandomForestClassifier(n_jobs=-1, n_estimators=260)
     # Train the classifier using the training features and labels.
     clf.fit(train_features, train_labels)
     # Use the classifier to make predictions on the test features.
@@ -49,13 +49,11 @@ def classify(train_features, train_labels, test_features, test_labels):
 def perf_evaluation(true_labels, predicted_labels, predicted_probs):
     
     perf_metrics = {}
-    print(true_labels)
-    print(predicted_labels)
     accuracy = accuracy_score(true_labels, predicted_labels)
     precision = precision_score(true_labels, predicted_labels, average='weighted')
     recall = recall_score(true_labels, predicted_labels, average='weighted')
     f1 = f1_score(true_labels, predicted_labels, average='weighted')
-    auc_roc = roc_auc_score(true_labels, predicted_probs, multi_class='ovr')
+    #auc_roc = roc_auc_score(true_labels, predicted_probs, multi_class='ovr')
 
     confusion = confusion_matrix(true_labels, predicted_labels)
     #tn, fp, fn, tp = confusion.ravel()
@@ -187,7 +185,7 @@ def load_data():
 
     features = []
     labels = []
-
+    
     features = extract_features(traces_name_filtered)
     labels = extract_labels(traces_name_filtered)
 
@@ -225,8 +223,14 @@ def count_packet(trace) -> int:
     with open("data_collection/"+trace,'rb') as pcap_file:
         pcap = dpkt.pcap.Reader(pcap_file)
         packet_count = 0
-        for pkt in pcap:
-            packet_count+=1
+
+        for timestamp, buf in pcap:
+            if len(buf) == 0:
+                return 0
+            ip = dpkt.ethernet.Ethernet(buf).data
+            if not ip_address(ip.src).is_private:
+                packet_count+=1
+ 
     return packet_count
 
 def measure_time_exchange(trace) -> float:
@@ -247,20 +251,31 @@ def count_rounds(trace):
     with open("data_collection/"+trace,'rb') as pcap_file:
         pcap = dpkt.pcap.Reader(pcap_file)
         rounds = 0
+        rounds_size = []
+        rounds_timestamps = []
+        current_round_size = 0
         last_seq = None
 
         for timestamp, buf in pcap:
             eth = dpkt.ethernet.Ethernet(buf)
             ip = eth.data
             tcp = ip.data
+
+            if current_round_size == 0:
+                
+                rounds_timestamps.append(timestamp)
         
             if last_seq is None:
                 last_seq = tcp.seq
             elif tcp.seq > last_seq:
                 rounds += 1
+                rounds_size.append(current_round_size)
+                current_round_size = 0
+
             last_seq = tcp.seq
+            current_round_size += len(buf)
     
-    return rounds
+    return rounds, rounds_size, rounds_timestamps
 
 def compute_total_size(trace):
     with open("data_collection/"+trace,'rb') as pcap_file:
@@ -271,25 +286,42 @@ def compute_total_size(trace):
         for timestamp, buf in pcap:
             eth = dpkt.ethernet.Ethernet(buf)
             ip = eth.data
-            total_size += ip.len
+            if not ip_address(ip.src).is_private:
+                total_size += ip.len
     
     return total_size
 
 def extract_features(filenames) -> List[List]:
     features = []
     for trace in filenames:
+
         # extract number of packet in the trace
         nb_packet = count_packet(trace)
+
         # extract exchange duration
         exchange_duration = measure_time_exchange(trace)
 
         # count the number of round
-        nb_rounds = count_rounds(trace)
+        nb_rounds, size_per_rounds, timestamps = count_rounds(trace)
 
-        # communication size in Byte
+        # communication size in Byte of server packet
         size = compute_total_size(trace)
 
-        features.append([nb_packet, exchange_duration, nb_rounds, size])
+        trace_feature = [nb_packet, exchange_duration, nb_rounds, size]
+
+        #print(len(size_per_rounds))
+        #print(len(timestamps))
+
+        features.append(trace_feature)
+
+    max_len_features = max([len(feature) for feature in features])
+    
+    for feature in features:
+        while len(feature) < max_len_features:
+            feature.append(1)
+    
+
+        
     return features
     
 def main():
