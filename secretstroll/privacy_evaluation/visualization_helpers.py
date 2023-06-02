@@ -1,4 +1,3 @@
-import datetime
 from typing import List, Dict, Tuple, Union
 
 import matplotlib.image as mpimg
@@ -68,7 +67,7 @@ class LocationHelper:
         h.imshow(mpimg.imread(self.background_file), aspect=h.get_aspect(), extent=h.get_xlim() + h.get_ylim(),
                  zorder=1)
 
-    def show_grid(self, show_nearby_pois=True, show_locations=True) -> None:
+    def show_grid(self, show_nearby_pois=True, show_locations=True, show_legend=True) -> None:
         """Show the grid."""
 
         # Create the figure
@@ -92,8 +91,9 @@ class LocationHelper:
         # Initialize the view
         ax.view_init(15, 30)
 
-        # Show the legend
-        plt.legend(markers, self.poi_types + ["user location"], numpoints=1)
+        # Show the legend inside the plot
+        if show_legend:
+            ax.legend(markers, self.poi_types + ["user location"], loc='upper right')
         plt.show()
 
     def __add_poi_to_grid(self, poi: POI, frequency: int = 1) -> None:
@@ -145,30 +145,3 @@ class LocationHelper:
 
         # For the legend
         return [plt.Line2D([0, 0], [0, 0], color='black', marker='o', linestyle='')]
-
-
-class TimeHelper:
-    @staticmethod
-    def plot_datetime_list(datetime_list: List[datetime.datetime]) -> None:
-        """Plot the datetime list. Each integer on the x-axis represents a day.
-            Each integer on the y-axis represents an hour. """
-
-        # Init the np array
-        heat_grid = np.zeros((24, 7))
-
-        # Iterate over the datetime list
-        for dt in datetime_list:
-            # Get the day and hour
-            day = dt.weekday()
-            hour = dt.hour
-
-            # Add the value to the array
-            heat_grid[hour, day] += 1
-
-        # Plot the data as sns heatmap
-        h = sns.heatmap(heat_grid, cmap="Greys", fmt="d", alpha=1, zorder=2, vmin=0,
-                        yticklabels=[str(i) if i % 3 == 0 else "" for i in range(24)],
-                        xticklabels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
-
-        # show the heatmap
-        plt.show()

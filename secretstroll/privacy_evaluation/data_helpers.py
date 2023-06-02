@@ -47,8 +47,10 @@ class Query:
 
 class QueryLoader:
 
-    def __init__(self, filename: str = "queries.csv"):
-        self.queries = self.__load(filename)
+    def __init__(self, filename: str = "queries.csv", queries: List[Query] = None):
+        self.queries = queries
+        if queries is None:
+            self.queries = self.__load(filename)
         self.queries_by_ip = self.__group_by_ip(self.queries)
 
     def __repr__(self):
