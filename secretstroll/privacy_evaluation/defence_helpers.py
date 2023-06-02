@@ -178,7 +178,7 @@ class Experiments:
         mean_home, std_home = [], []
 
         # Compute the cell id learning difficulty
-        for k in range(1, 10):
+        for k in range(1, 9):
             measures_work, measures_home = self.__get_cell_id_learning_difficulty(original_user_profiles, k, n)
             mean_work.append(np.mean(measures_work))
             std_work.append(np.std(measures_work))
@@ -207,12 +207,12 @@ class Experiments:
             clear_output(wait=False)
 
             # Compute the cell id learning difficulty
-            work_cell_id_learning_difficulty = sum([
+            work_cell_id_learning_difficulty = 1 - sum([
                 1 if original_user_profiles[ip].work_cell_id == user_profiles[ip].work_cell_id else 0 for ip in
                 original_user_profiles.keys()
             ]) / len(original_user_profiles.keys())
 
-            home_cell_id_learning_difficulty = sum([
+            home_cell_id_learning_difficulty = 1 - sum([
                 1 if original_user_profiles[ip].home_cell_id == user_profiles[ip].home_cell_id else 0 for ip in
                 original_user_profiles.keys()
             ]) / len(original_user_profiles.keys())

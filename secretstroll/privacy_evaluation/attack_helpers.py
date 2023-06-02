@@ -1,3 +1,4 @@
+import random
 from datetime import datetime
 from multiprocessing import Pool
 from typing import List, Dict, Tuple, Union, Any, Set
@@ -181,8 +182,9 @@ class AttackHelper:
                 queries
             )
         )
+        random.shuffle(cell_ids)
 
-        # Return the most frequent cell id
+        # Return the most frequent cell id, choose at random if there are multiple
         return max(cell_ids, key=cell_ids.count)
 
 
