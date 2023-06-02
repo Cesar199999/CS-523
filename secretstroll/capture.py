@@ -31,5 +31,5 @@ def listen_to_trace(i):
 
 for j in range(1):
     # we iterate over all cells in the grid.
-    for i in range(1, 31):
+    for i in range(1, 101):
         listen_to_trace(i)
