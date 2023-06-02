@@ -1,8 +1,10 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import dpkt
 import pandas as pd
 import re
+import seaborn as sns
 import sys
 
 from ipaddress import ip_address
@@ -166,6 +168,10 @@ def load_data():
     dataframe = pd.DataFrame(data=traces)
     dataframe = dataframe.set_index('trace_grid_id')
     dataframe = dataframe.sort_index()
+
+    plt.figure(figsize=(12, 3))
+    plt.scatter(dataframe.index, dataframe["trace_len"])
+    plt.show()
 
     filtered_traces = remove_outliers(dataframe)
     traces_name_filtered = [filename for filename in traces_name if filename in filtered_traces.filename.values.tolist()]
