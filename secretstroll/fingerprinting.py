@@ -36,7 +36,7 @@ def classify(train_features, train_labels, test_features, test_labels):
     """
 
     # Initialize a random forest classifier. Change parameters if desired.
-    clf = RandomForestClassifier(n_jobs=-1, n_estimators=400)
+    clf = RandomForestClassifier(n_jobs=-1, n_estimators=200)
     # Train the classifier using the training features and labels.
     clf.fit(train_features, train_labels)
     # Use the classifier to make predictions on the test features.
