@@ -36,7 +36,7 @@ def classify(train_features, train_labels, test_features, test_labels):
     """
 
     # Initialize a random forest classifier. Change parameters if desired.
-    clf = RandomForestClassifier(n_jobs=-1, n_estimators=260)
+    clf = RandomForestClassifier(n_jobs=-1, n_estimators=400)
     # Train the classifier using the training features and labels.
     clf.fit(train_features, train_labels)
     # Use the classifier to make predictions on the test features.
@@ -53,20 +53,11 @@ def perf_evaluation(true_labels, predicted_labels, predicted_probs):
     precision = precision_score(true_labels, predicted_labels, average='weighted')
     recall = recall_score(true_labels, predicted_labels, average='weighted')
     f1 = f1_score(true_labels, predicted_labels, average='weighted')
-    #auc_roc = roc_auc_score(true_labels, predicted_probs, multi_class='ovr')
-
-    confusion = confusion_matrix(true_labels, predicted_labels)
-    #tn, fp, fn, tp = confusion.ravel()
 
     perf_metrics['accuracy'] = accuracy
     perf_metrics['precision'] = precision
     perf_metrics['recall'] = recall
     perf_metrics['f1-score'] = f1
-    #perf_metrics['true_positive'] = tp
-    #perf_metrics['true_negative'] = tn
-    #perf_metrics['false_positive'] = fp
-    #perf_metrics['false_negative'] = fn
-    #perf_metrics['auc_roc'] = auc_roc
 
     return perf_metrics
 
@@ -91,19 +82,16 @@ def aggregate_performance(performance_metrics_list):
         precisions.append(metrics['precision'])
         recalls.append(metrics['recall'])
         f1_scores.append(metrics['f1-score'])
-        #auc_rocs.append(metrics['auc_roc'])
 
     aggregated_metrics['accuracy_mean'] = np.mean(accuracies)
     aggregated_metrics['precision_mean'] = np.mean(precisions)
     aggregated_metrics['recall_mean'] = np.mean(recalls)
     aggregated_metrics['f1_score_mean'] = np.mean(f1_scores)
-    #aggregated_metrics['auc_roc_mean'] = np.mean(auc_rocs)
 
     aggregated_metrics['accuracy_std'] = np.std(accuracies)
     aggregated_metrics['precision_std'] = np.std(precisions)
     aggregated_metrics['recall_std'] = np.std(recalls)
     aggregated_metrics['f1_score_std'] = np.std(f1_scores)
-    #aggregated_metrics['auc_roc_std'] = np.std(auc_rocs)
 
     return aggregated_metrics
 
@@ -141,7 +129,6 @@ def perform_crossval(features, labels, folds=10):
     print("precision: "+str(global_perf['precision_mean']))
     print("recall: "+str(global_perf['recall_mean']))
     print("f1_score: "+str(global_perf['f1_score_mean']))
-    #print("au_roc: "+str(global_perf['auc_roc_mean']))
 
 def load_data():
 
@@ -197,11 +184,25 @@ def extract_labels(traces):
         labels.append([int(s) for s in re.split('[_.]', trace) if s.isdigit()][0])
     return labels
 
+def first_packet_is_from_client(trace):
+    with open("data_collection/"+trace,'rb') as pcap_file:
+        pcap = dpkt.pcap.Reader(pcap_file)
+        packet_count = 0
+
+        for timestamp, buf in pcap:
+            eth = dpkt.ethernet.Ethernet(buf)
+            ip = eth.data
+
+            if ip.p == dpkt.ip.IP_PROTO_TCP:
+                return ip_address(ip.src).is_private
+
 def pre_process_pcap_file(directory) -> List[Trace]:
     traces = []
     for filename in directory:
         packet_count = 0
         packet_count = count_packet(filename)
+
+        #if first_packet_is_from_client(filename):
         traces.append({'filename': filename, 'trace_grid_id' : [int(s) for s in re.split('[_.]', filename) if s.isdigit()][0], 'trace_len': packet_count})
 
     return traces
@@ -309,19 +310,8 @@ def extract_features(filenames) -> List[List]:
 
         trace_feature = [nb_packet, exchange_duration, nb_rounds, size]
 
-        #print(len(size_per_rounds))
-        #print(len(timestamps))
-
         features.append(trace_feature)
-
-    max_len_features = max([len(feature) for feature in features])
-    
-    for feature in features:
-        while len(feature) < max_len_features:
-            feature.append(1)
-    
-
-        
+  
     return features
     
 def main():
